@@ -5,7 +5,7 @@ import { commands } from './commands/index.js';
 import { createState, applyVerification } from './verification.js';
 import { startServer } from './server.js';
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.commands = new Collection(commands.map((command) => [command.data.name, command]));
 client.usersDb = users;
 client.createState = createState;
