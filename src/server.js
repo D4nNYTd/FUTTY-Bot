@@ -2,6 +2,7 @@ import express from 'express';
 import { oauthStates, users } from './db.js';
 import { exchangeCode, getUserInfo } from './roblox.js';
 import { verifyMember } from './verification.js';
+import { robloxConfigured } from './config.js';
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
@@ -14,6 +15,7 @@ function page(title, message) {
 export function startServer(client, port) {
   const app = express();
   app.get('/callback', async (request, response) => {
+    if (!robloxConfigured) return response.status(503).send(page('Verification unavailable', 'Roblox verification is not configured yet.'));
     const { code, state, error } = request.query;
     if (error || !code || !state) return response.status(400).send(page('Verification failed', 'The Roblox sign-in was cancelled or incomplete.'));
     const savedState = oauthStates.consume(state);

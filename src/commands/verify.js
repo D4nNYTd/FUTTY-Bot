@@ -2,10 +2,12 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashComman
 import { oauthStates } from '../db.js';
 import { authorizationUrl } from '../roblox.js';
 import { applyVerification } from '../verification.js';
+import { robloxConfigured } from '../config.js';
 
 export default {
   data: new SlashCommandBuilder().setName('verify').setDescription('Link your Roblox account.'),
   async execute(interaction) {
+    if (!robloxConfigured) return interaction.reply({ content: 'Roblox verification is not configured yet.', ephemeral: true });
     const existing = interaction.client.usersDb.getByDiscord(interaction.user.id);
     if (existing) {
       const result = await applyVerification(interaction.member, { username: existing.username, display_name: existing.display_name });
