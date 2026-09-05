@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import { config } from './config.js';
 import { users, oauthStates } from './db.js';
 import { commands } from './commands/index.js';
@@ -11,8 +11,18 @@ client.usersDb = users;
 client.createState = createState;
 client.config = config;
 
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+  const rest = new REST({ version: '10' }).setToken(config.discordToken);
+  const route = config.guildId
+    ? Routes.applicationGuildCommands(config.discordClientId, config.guildId)
+    : Routes.applicationCommands(config.discordClientId);
+  try {
+    await rest.put(route, { body: commands.map((command) => command.data.toJSON()) });
+    console.log(`Registered ${commands.length} slash commands${config.guildId ? ` for guild ${config.guildId}` : ' globally'}.`);
+  } catch (error) {
+    console.error('Failed to register slash commands:', error);
+  }
   startServer(client, config.port);
   setInterval(() => oauthStates.purge(), 60 * 1000);
 });
