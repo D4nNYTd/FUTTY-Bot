@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 import { config } from './config.js';
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 const db = new Database(config.dbPath);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.run('PRAGMA journal_mode = WAL');
+db.run('PRAGMA foreign_keys = ON');
 
-db.exec(`
+db.run(`
   CREATE TABLE IF NOT EXISTS users (
     discord_id TEXT PRIMARY KEY,
     roblox_id TEXT NOT NULL UNIQUE,
@@ -35,24 +35,24 @@ db.exec(`
 `);
 
 const statements = {
-  userByDiscord: db.prepare('SELECT * FROM users WHERE discord_id = ?'),
-  userByRoblox: db.prepare('SELECT * FROM users WHERE roblox_id = ?'),
-  saveUser: db.prepare(`INSERT INTO users (discord_id, roblox_id, username, display_name, verified_at)
+  userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
+  userByRoblox: db.query('SELECT * FROM users WHERE roblox_id = ?'),
+  saveUser: db.query(`INSERT INTO users (discord_id, roblox_id, username, display_name, verified_at)
     VALUES (@discordId, @robloxId, @username, @displayName, @verifiedAt)
     ON CONFLICT(discord_id) DO UPDATE SET roblox_id = excluded.roblox_id, username = excluded.username,
     display_name = excluded.display_name, verified_at = excluded.verified_at`),
-  updateUser: db.prepare('UPDATE users SET username = ?, display_name = ? WHERE discord_id = ?'),
-  guild: db.prepare('SELECT * FROM guilds WHERE guild_id = ?'),
-  saveGuild: db.prepare(`INSERT INTO guilds (guild_id, nick_format, role_id) VALUES (?, ?, ?)
+  updateUser: db.query('UPDATE users SET username = ?, display_name = ? WHERE discord_id = ?'),
+  guild: db.query('SELECT * FROM guilds WHERE guild_id = ?'),
+  saveGuild: db.query(`INSERT INTO guilds (guild_id, nick_format, role_id) VALUES (?, ?, ?)
     ON CONFLICT(guild_id) DO UPDATE SET nick_format = COALESCE(excluded.nick_format, guilds.nick_format), role_id = COALESCE(excluded.role_id, guilds.role_id)`),
-  state: db.prepare('SELECT * FROM oauth_states WHERE state = ? AND expires_at > ?'),
-  saveState: db.prepare('INSERT INTO oauth_states (state, discord_id, guild_id, expires_at) VALUES (?, ?, ?, ?)'),
-  deleteState: db.prepare('DELETE FROM oauth_states WHERE state = ?'),
-  purgeStates: db.prepare('DELETE FROM oauth_states WHERE expires_at <= ?'),
-  admin: db.prepare('SELECT 1 FROM admins WHERE guild_id = ? AND target_id = ?'),
-  addAdmin: db.prepare('INSERT OR IGNORE INTO admins (guild_id, target_id) VALUES (?, ?)'),
-  removeAdmin: db.prepare('DELETE FROM admins WHERE guild_id = ? AND target_id = ?'),
-  admins: db.prepare('SELECT target_id FROM admins WHERE guild_id = ?')
+  state: db.query('SELECT * FROM oauth_states WHERE state = ? AND expires_at > ?'),
+  saveState: db.query('INSERT INTO oauth_states (state, discord_id, guild_id, expires_at) VALUES (?, ?, ?, ?)'),
+  deleteState: db.query('DELETE FROM oauth_states WHERE state = ?'),
+  purgeStates: db.query('DELETE FROM oauth_states WHERE expires_at <= ?'),
+  admin: db.query('SELECT 1 FROM admins WHERE guild_id = ? AND target_id = ?'),
+  addAdmin: db.query('INSERT OR IGNORE INTO admins (guild_id, target_id) VALUES (?, ?)'),
+  removeAdmin: db.query('DELETE FROM admins WHERE guild_id = ? AND target_id = ?'),
+  admins: db.query('SELECT target_id FROM admins WHERE guild_id = ?')
 };
 
 export const users = {
