@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
 import { config } from './config.js';
 import { users, oauthStates } from './db.js';
 import { commands } from './commands/index.js';
@@ -11,7 +11,7 @@ client.usersDb = users;
 client.createState = createState;
 client.config = config;
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
   const route = config.guildId
@@ -37,7 +37,7 @@ client.on('interactionCreate', async (interaction) => {
     if (command) await command.execute(interaction);
   } catch (error) {
     console.error(error);
-    const reply = { content: 'Something went wrong.', ephemeral: true };
+    const reply = { content: 'Something went wrong.', flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) await interaction.followUp(reply);
     else await interaction.reply(reply);
   }
