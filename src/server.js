@@ -16,8 +16,12 @@ export function startServer(client, port) {
   const app = express();
   app.get('/callback', async (request, response) => {
     if (!robloxConfigured) return response.status(503).send(page('Verification unavailable', 'Roblox verification is not configured yet.'));
-    const { code, state, error } = request.query;
-    if (error || !code || !state) return response.status(400).send(page('Verification failed', 'The Roblox sign-in was cancelled or incomplete.'));
+    const { code, state, error, error_description } = request.query;
+    if (error) {
+      console.error(`Roblox OAuth error: ${error}. ${error_description}`);
+      return response.status(400).send(page('Verification failed', `Roblox returned an error: ${error}. ${error_description}`));
+    }
+    if (!code || !state) return response.status(400).send(page('Verification failed', 'The Roblox sign-in was cancelled or incomplete.'));
     const savedState = oauthStates.consume(state);
     if (!savedState) return response.status(400).send(page('Verification failed', 'This verification link is invalid or expired.'));
     try {
@@ -29,6 +33,7 @@ export function startServer(client, port) {
       const details = result.warnings.length ? ` Roblox account linked, with warnings: ${result.warnings.join(' ')}` : ' Roblox account linked and your server access was updated.';
       return response.send(page('Verification complete', details));
     } catch (caught) {
+      console.error(caught);
       const message = caught.message.includes('already linked') ? caught.message : 'The verification could not be completed.';
       return response.status(400).send(page('Verification failed', message));
     }
