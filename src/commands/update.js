@@ -12,8 +12,10 @@ export default {
     const linked = users.getByDiscord(target.id);
     if (!linked) return interaction.reply({ content: 'That user is not verified.', flags: MessageFlags.Ephemeral });
     const profile = await getUser(linked.roblox_id);
-    users.update(target.id, profile.name, profile.displayName);
-    const result = await applyVerification(target, { username: profile.name, display_name: profile.displayName });
+    const username = profile.name || profile.userName || linked.username;
+    const displayName = profile.displayName || profile.name || linked.display_name;
+    users.update(target.id, username, displayName);
+    const result = await applyVerification(target, { username, display_name: displayName });
     const warningText = result.warnings.length ? ` ${result.warnings.join(' ')}` : '';
     return interaction.reply({ content: `Updated ${target.user.username}'s Roblox data and nickname.${warningText}`, flags: MessageFlags.Ephemeral });
   }

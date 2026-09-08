@@ -55,9 +55,12 @@ const statements = {
   admins: db.query('SELECT target_id FROM admins WHERE guild_id = ?')
 };
 
+const allUsers = db.query('SELECT * FROM users');
+
 export const users = {
   getByDiscord: (id) => statements.userByDiscord.get(id),
   getByRoblox: (id) => statements.userByRoblox.get(id),
+  getAll: () => allUsers.all(),
   save: (user) => statements.saveUser.run(user),
   update: (discordId, username, displayName) => statements.updateUser.run(username, displayName, discordId)
 };

@@ -11,7 +11,11 @@ export function formatNickname(member, user, format) {
 }
 
 function findRole(guild, roleId) {
-  return (roleId && guild.roles.cache.get(roleId)) || guild.roles.cache.find((role) => role.name === config.verifiedRole);
+  if (roleId) {
+    const cached = guild.roles.cache.get(roleId);
+    if (cached) return cached;
+  }
+  return guild.roles.cache.find((role) => role.name === config.verifiedRole) || null;
 }
 
 export async function applyVerification(member, user) {
@@ -20,15 +24,39 @@ export async function applyVerification(member, user) {
   const role = findRole(member.guild, settings?.role_id);
   const warnings = [];
 
-  if (!role) warnings.push('The verified role was not found.');
-  else if (member.guild.members.me && role.position >= member.guild.members.me.roles.highest.position) warnings.push('I cannot assign the verified role because it is above my highest role.');
+  if (!role) warnings.push('Verified role not found.');
+  else if (member.guild.members.me && role.position >= member.guild.members.me.roles.highest.position) warnings.push('Verified role is above my highest role.');
   else {
-    try { await member.roles.add(role); } catch { warnings.push('I could not assign the verified role.'); }
+    try { await member.roles.add(role); } catch { warnings.push('Failed to assign verified role.'); }
   }
 
   const nickname = formatNickname(member, user, format);
-  try { await member.setNickname(nickname); } catch { warnings.push('I could not update the nickname.'); }
+  try {
+    await member.setNickname(nickname);
+  } catch (err) {
+    if (member.id === member.guild.ownerId) warnings.push('Cannot change server owner nickname.');
+    else warnings.push('Failed to update nickname.');
+  }
   return { nickname, warnings };
+}
+
+export async function refreshAllNicknames(guild) {
+  const settings = guilds.get(guild.id);
+  const format = settings?.nick_format || config.nickFormat;
+  const results = { updated: 0, failed: 0, errors: [] };
+
+  for (const [discordId, user] of Object.entries(users.getAllForGuild ? users.getAllForGuild() : {})) {
+    try {
+      const member = await guild.members.fetch(discordId).catch(() => null);
+      if (!member) continue;
+      const nickname = formatNickname(member, { username: user.username, display_name: user.display_name }, format);
+      await member.setNickname(nickname);
+      results.updated++;
+    } catch {
+      results.failed++;
+    }
+  }
+  return results;
 }
 
 export async function verifyMember(member, robloxUser) {

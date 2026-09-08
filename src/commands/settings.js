@@ -1,7 +1,8 @@
 import { ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { admins, guilds } from '../db.js';
+import { admins, guilds, users } from '../db.js';
 import { isAdmin } from '../permissions.js';
 import { postPanel } from '../panel.js';
+import { formatNickname } from '../verification.js';
 
 const command = new SlashCommandBuilder().setName('settings').setDescription('Manage verification settings.')
   .addSubcommand((sub) => sub.setName('nick').setDescription('Set the nickname format.').addStringOption((option) => option.setName('format').setDescription('Use {roblox}, {display}, or {discord}.').setRequired(true)))
@@ -20,7 +21,24 @@ export default {
       const format = interaction.options.getString('format');
       if (!format.includes('{roblox}') && !format.includes('{display}')) return interaction.reply({ content: 'The format must contain {roblox} or {display}.', flags: MessageFlags.Ephemeral });
       guilds.save(interaction.guildId, format, null);
-      return interaction.reply({ content: `Nickname format saved. Preview: ${format.replaceAll('{roblox}', 'Builderman').replaceAll('{display}', 'Builder Man').replaceAll('{discord}', interaction.user.username).slice(0, 32)}`, flags: MessageFlags.Ephemeral });
+      const preview = format.replaceAll('{roblox}', 'Builderman').replaceAll('{display}', 'Builder Man').replaceAll('{discord}', interaction.user.username).slice(0, 32);
+      await interaction.reply({ content: `Nickname format saved. Preview: ${preview}\nUpdating verified members...`, flags: MessageFlags.Ephemeral });
+      
+      let updated = 0;
+      let failed = 0;
+      const allUsers = users.getAll();
+      for (const user of allUsers) {
+        try {
+          const member = await interaction.guild.members.fetch(user.discord_id).catch(() => null);
+          if (!member) continue;
+          const nickname = formatNickname(member, { username: user.username, display_name: user.display_name }, format);
+          await member.setNickname(nickname);
+          updated++;
+        } catch {
+          failed++;
+        }
+      }
+      return interaction.followUp({ content: `Updated ${updated} members. ${failed > 0 ? `${failed} failed.` : ''}`, flags: MessageFlags.Ephemeral });
     }
     if (subcommand === 'role') {
       const role = interaction.options.getRole('role');
