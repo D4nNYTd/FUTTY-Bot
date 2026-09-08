@@ -34,7 +34,7 @@ export function startServer(client, port) {
       return response.send(page('Verification complete', details));
     } catch (caught) {
       console.error(caught);
-      const message = caught.message.includes('already linked') ? caught.message : 'The verification could not be completed.';
+      const message = caught.message.includes('already linked') ? caught.message : `Verification failed: ${caught.message}`.slice(0, 300);
       return response.status(400).send(page('Verification failed', message));
     }
   });
