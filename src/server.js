@@ -8,8 +8,9 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
 }
 
-function page(title, message) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#111827;color:#e5e7eb;font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh}main{max-width:420px;padding:32px;text-align:center}h1{font-size:24px}p{line-height:1.5;color:#9ca3af}</style></head><body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main></body></html>`;
+export function page(title, message, autoClose) {
+  const script = autoClose ? `<script>setTimeout(function(){try{window.close()}catch(e){}},${Number(autoClose)});</script>` : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>body{margin:0;background:#111827;color:#e5e7eb;font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh}main{max-width:420px;padding:32px;text-align:center}h1{font-size:24px}p{line-height:1.5;color:#9ca3af}</style></head><body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main>${script}</body></html>`;
 }
 
 export function startServer(client, port) {
@@ -31,7 +32,7 @@ export function startServer(client, port) {
       const member = await guild.members.fetch(savedState.discord_id);
       const result = await verifyMember(member, robloxUser);
       const details = result.warnings.length ? ` Roblox account linked, with warnings: ${result.warnings.join(' ')}` : ' Roblox account linked and your server access was updated.';
-      return response.send(page('Verification complete', details));
+      return response.send(page('Verification complete', details, 5000));
     } catch (caught) {
       console.error(caught);
       const message = caught.message.includes('already linked') ? caught.message : `Verification failed: ${caught.message}`.slice(0, 300);
