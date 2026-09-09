@@ -25,6 +25,34 @@ client.once('clientReady', async () => {
   }
   startServer(client, config.port);
   setInterval(() => oauthStates.purge(), 60 * 1000);
+
+  for (const guildId of allowedGuildIds) {
+    try {
+      const guild = await client.guilds.fetch(guildId).catch(() => null);
+      if (!guild) continue;
+      const verifiedRole = guild.roles.cache.find(
+        (r) => r.name === config.verifiedRole && !r.managed && r.id !== guild.id
+      );
+      const unverifiedRole = guild.roles.cache.find(
+        (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
+      );
+      if (!verifiedRole || !unverifiedRole) continue;
+      const members = await guild.members.fetch().catch(() => null);
+      if (!members) continue;
+      let cleaned = 0;
+      for (const [, member] of members) {
+        if (member.roles.cache.has(verifiedRole.id) && member.roles.cache.has(unverifiedRole.id)) {
+          try {
+            await member.roles.remove(unverifiedRole);
+            cleaned++;
+          } catch {}
+        }
+      }
+      if (cleaned > 0) console.log(`Removed Unverified role from ${cleaned} members in ${guild.name}`);
+    } catch (error) {
+      console.error(`Failed to clean Unverified roles in ${guildId}:`, error);
+    }
+  }
 });
 
 const allowedGuildIds = config.guildId
