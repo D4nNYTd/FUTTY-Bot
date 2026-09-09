@@ -15,8 +15,9 @@ function findRole(guild, roleId) {
     const cached = guild.roles.cache.get(roleId);
     if (cached && !cached.managed && cached.id !== guild.id) return cached;
   }
+  const targetName = config.verifiedRole.toLowerCase();
   return guild.roles.cache.find(
-    (role) => role.name === config.verifiedRole && !role.managed && role.id !== guild.id
+    (role) => role.name.toLowerCase() === targetName && !role.managed && role.id !== guild.id
   ) || null;
 }
 

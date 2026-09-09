@@ -30,8 +30,9 @@ client.once('clientReady', async () => {
     try {
       const guild = await client.guilds.fetch(guildId).catch(() => null);
       if (!guild) continue;
+      const verifiedRoleName = config.verifiedRole.toLowerCase();
       const verifiedRole = guild.roles.cache.find(
-        (r) => r.name === config.verifiedRole && !r.managed && r.id !== guild.id
+        (r) => r.name.toLowerCase() === verifiedRoleName && !r.managed && r.id !== guild.id
       );
       const unverifiedRole = guild.roles.cache.find(
         (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
