@@ -127,6 +127,29 @@ client.once('clientReady', async () => {
       }
 
       console.log(`[Cleanup] Summary for ${guild.name}: removed=${cleaned}, no-verified-role=${skippedNotVerified}, no-unverified-role=${skippedNoUnverified}, fetch-failed=${fetchFailed}, total-db-users=${dbUsers.length}`);
+
+      // Pass 2: Remove Verified role from members NOT in DB
+      const verifiedDbIds = new Set(dbUsers.map((u) => u.discord_id));
+      let purged = 0;
+      try {
+        const allMembers = await guild.members.fetch();
+        for (const [, member] of allMembers) {
+          if (member.user.bot) continue;
+          if (verifiedDbIds.has(member.id)) continue;
+          const memberVerifiedRoles = member.roles.cache.filter(
+            (r) => r.name.toLowerCase() === verifiedRoleName && !r.managed && r.id !== guild.id
+          );
+          if (memberVerifiedRoles.size === 0) continue;
+          for (const [, vr] of memberVerifiedRoles) {
+            await member.roles.remove(vr);
+            console.log(`[Cleanup] ✓ Purged Verified role "${vr.name}" (${vr.id}) from non-verified ${member.user.tag}`);
+            purged++;
+          }
+        }
+      } catch (err) {
+        console.error(`[Cleanup] Failed to purge non-verified members: ${err.message}`);
+      }
+      console.log(`[Cleanup] Purged Verified from ${purged} non-verified members in ${guild.name}`);
     } catch (error) {
       console.error(`[Cleanup] FATAL ERROR processing guild ${guildId}:`, error.message);
     }
