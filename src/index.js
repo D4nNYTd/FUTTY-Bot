@@ -32,15 +32,29 @@ client.once('clientReady', async () => {
   startServer(client, config.port);
   setInterval(() => oauthStates.purge(), 60 * 1000);
 
+  // Wait for guild/member cache to populate
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
   const guildIdsToClean = allowedGuildIds.length > 0
     ? allowedGuildIds
     : client.guilds.cache.map((g) => g.id);
-  console.log(`[Cleanup] Will check ${guildIdsToClean.length} guild(s)`);
+  console.log(`[Cleanup] Will check ${guildIdsToClean.length} guild(s): ${guildIdsToClean.join(', ')}`);
+
+  const dbUsers = users.getAll();
+  console.log(`[Cleanup] Total verified users in DB: ${dbUsers.length}`);
+  if (dbUsers.length === 0) {
+    console.log('[Cleanup] WARNING: No verified users found in database. Cleanup will skip.');
+  }
 
   for (const guildId of guildIdsToClean) {
     try {
       const guild = await client.guilds.fetch(guildId).catch(() => null);
-      if (!guild) continue;
+      if (!guild) {
+        console.log(`[Cleanup] Guild ${guildId} not found or inaccessible`);
+        continue;
+      }
+      console.log(`[Cleanup] Processing guild: ${guild.name} (${guild.id})`);
+
       const verifiedRoleName = config.verifiedRole.toLowerCase();
       const verifiedRole = guild.roles.cache.find(
         (r) => r.name.toLowerCase() === verifiedRoleName && !r.managed && r.id !== guild.id
@@ -48,34 +62,61 @@ client.once('clientReady', async () => {
       const unverifiedRole = guild.roles.cache.find(
         (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
       );
-      if (!verifiedRole) { console.log(`[Cleanup] Verified role not found in ${guild.name}`); continue; }
-      if (!unverifiedRole) { console.log(`[Cleanup] Unverified role not found in ${guild.name}`); continue; }
+
+      console.log(`[Cleanup] Looking for Verified role (name: "${config.verifiedRole}"): ${verifiedRole ? `found (${verifiedRole.name}, pos ${verifiedRole.position})` : 'NOT FOUND'}`);
+      console.log(`[Cleanup] Looking for Unverified role: ${unverifiedRole ? `found (${unverifiedRole.name}, pos ${unverifiedRole.position})` : 'NOT FOUND'}`);
+
+      if (!verifiedRole) { console.log(`[Cleanup] SKIP: Verified role not found in ${guild.name}`); continue; }
+      if (!unverifiedRole) { console.log(`[Cleanup] SKIP: Unverified role not found in ${guild.name}`); continue; }
+
       const botMember = guild.members.me;
+      if (botMember) {
+        console.log(`[Cleanup] Bot highest role: ${botMember.roles.highest.name} (pos ${botMember.roles.highest.position})`);
+      }
       if (botMember && unverifiedRole.position >= botMember.roles.highest.position) {
-        console.log(`[Cleanup] Unverified role is above my highest role in ${guild.name}. Move my role higher.`);
+        console.log(`[Cleanup] BLOCKED: Unverified role (pos ${unverifiedRole.position}) is at or above bot's highest role (pos ${botMember.roles.highest.position}). Move bot role higher in server settings.`);
         continue;
       }
-      const allUsers = users.getAll();
+
       let cleaned = 0;
-      for (const user of allUsers) {
+      let skippedNotVerified = 0;
+      let skippedNoUnverified = 0;
+      let fetchFailed = 0;
+
+      for (const user of dbUsers) {
         try {
           const member = await guild.members.fetch(user.discord_id).catch(() => null);
-          if (!member) continue;
-          if (member.roles.cache.has(verifiedRole.id) && member.roles.cache.has(unverifiedRole.id)) {
-            await member.roles.remove(unverifiedRole);
-            cleaned++;
-            console.log(`[Cleanup] Removed Unverified from ${member.user.tag} in ${guild.name}`);
+          if (!member) {
+            fetchFailed++;
+            continue;
           }
+          const hasVerified = member.roles.cache.has(verifiedRole.id);
+          const hasUnverified = member.roles.cache.has(unverifiedRole.id);
+
+          if (!hasVerified) {
+            skippedNotVerified++;
+            continue;
+          }
+          if (!hasUnverified) {
+            skippedNoUnverified++;
+            continue;
+          }
+
+          await member.roles.remove(unverifiedRole);
+          cleaned++;
+          console.log(`[Cleanup] ✓ Removed Unverified from ${member.user.tag}`);
         } catch (err) {
-          console.error(`[Cleanup] Failed to remove Unverified from ${user.discord_id}:`, err.message);
+          console.error(`[Cleanup] ✗ Error removing Unverified from ${user.discord_id}: ${err.message}`);
         }
       }
-      if (cleaned > 0) console.log(`[Cleanup] Removed Unverified role from ${cleaned} members in ${guild.name}`);
-      else console.log(`[Cleanup] No members needed Unverified removal in ${guild.name}`);
+
+      console.log(`[Cleanup] Summary for ${guild.name}: removed=${cleaned}, no-verified-role=${skippedNotVerified}, no-unverified-role=${skippedNoUnverified}, fetch-failed=${fetchFailed}, total-db-users=${dbUsers.length}`);
     } catch (error) {
-      console.error(`Failed to clean Unverified roles in ${guildId}:`, error);
+      console.error(`[Cleanup] FATAL ERROR processing guild ${guildId}:`, error.message);
     }
   }
+  console.log('[Cleanup] Cleanup complete.');
+
 });
 
 client.on('interactionCreate', async (interaction) => {
