@@ -38,16 +38,17 @@ client.once('clientReady', async () => {
         (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
       );
       if (!verifiedRole || !unverifiedRole) continue;
-      const members = await guild.members.fetch().catch(() => null);
-      if (!members) continue;
+      const allUsers = users.getAll();
       let cleaned = 0;
-      for (const [, member] of members) {
-        if (member.roles.cache.has(verifiedRole.id) && member.roles.cache.has(unverifiedRole.id)) {
-          try {
+      for (const user of allUsers) {
+        try {
+          const member = await guild.members.fetch(user.discord_id).catch(() => null);
+          if (!member) continue;
+          if (member.roles.cache.has(verifiedRole.id) && member.roles.cache.has(unverifiedRole.id)) {
             await member.roles.remove(unverifiedRole);
             cleaned++;
-          } catch {}
-        }
+          }
+        } catch {}
       }
       if (cleaned > 0) console.log(`Removed Unverified role from ${cleaned} members in ${guild.name}`);
     } catch (error) {
