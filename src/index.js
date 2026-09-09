@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
+import { Client, Collection, EmbedBuilder, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
 import { config } from './config.js';
 import { users, oauthStates } from './db.js';
 import { commands } from './commands/index.js';
@@ -58,8 +58,11 @@ client.on('guildMemberAdd', async (member) => {
   if (!linked) return;
   try {
     const result = await applyVerification(member, { username: linked.username, display_name: linked.display_name });
-    const message = `You have been verified in ${member.guild.name}. Your nickname has been set to ${result.nickname}.`;
-    await member.send(message).catch(() => {});
+    const embed = new EmbedBuilder()
+      .setTitle(member.guild.name)
+      .setThumbnail(member.guild.iconURL({ size: 128 }) || null)
+      .setDescription(`You have been verified. Your nickname has been set to ${result.nickname}.`);
+    await member.send({ embeds: [embed] }).catch(() => {});
   } catch (error) {
     console.error(error);
   }
