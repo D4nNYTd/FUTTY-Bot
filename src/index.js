@@ -56,7 +56,13 @@ client.on('interactionCreate', async (interaction) => {
 client.on('guildMemberAdd', async (member) => {
   const linked = users.getByDiscord(member.id);
   if (!linked) return;
-  try { await applyVerification(member, { username: linked.username, display_name: linked.display_name }); } catch (error) { console.error(error); }
+  try {
+    const result = await applyVerification(member, { username: linked.username, display_name: linked.display_name });
+    const message = `You have been verified in ${member.guild.name}. Your nickname has been set to ${result.nickname}.`;
+    await member.send(message).catch(() => {});
+  } catch (error) {
+    console.error(error);
+  }
 });
 
 client.login(config.discordToken);
