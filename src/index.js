@@ -92,32 +92,35 @@ client.once('clientReady', async () => {
           }
           const roleNames = member.roles.cache.map((r) => r.name).join(', ');
           console.log(`[Cleanup] User ${member.user.tag} roles: [${roleNames}]`);
-          const hasVerified = member.roles.cache.some((r) => r.name.toLowerCase() === verifiedRoleName);
-          const memberUnverifiedRoles = member.roles.cache.filter((r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id);
 
-          if (!hasVerified) {
-            skippedNotVerified++;
-            continue;
-          }
-          if (memberUnverifiedRoles.size === 0) {
-            skippedNoUnverified++;
-            continue;
-          }
-
-          for (const [, roleToRemove] of memberUnverifiedRoles) {
-            await member.roles.remove(roleToRemove);
-            console.log(`[Cleanup] ✓ Removed unverified role "${roleToRemove.name}" (${roleToRemove.id}) from ${member.user.tag}`);
-          }
-
-          const duplicateVerifiedRoles = member.roles.cache.filter(
-            (r) => r.name.toLowerCase() === verifiedRoleName && r.id !== verifiedRole.id && !r.managed && r.id !== guild.id
+          // Remove ALL verified roles (any case)
+          const allVerifiedRoles = member.roles.cache.filter(
+            (r) => r.name.toLowerCase() === verifiedRoleName && !r.managed && r.id !== guild.id
           );
-          for (const [, dupRole] of duplicateVerifiedRoles) {
-            await member.roles.remove(dupRole);
-            console.log(`[Cleanup] ✓ Removed duplicate Verified role "${dupRole.name}" (${dupRole.id}) from ${member.user.tag}`);
+          for (const [, vr] of allVerifiedRoles) {
+            await member.roles.remove(vr);
+            console.log(`[Cleanup] ✓ Removed Verified role "${vr.name}" (${vr.id}) from ${member.user.tag}`);
           }
 
-          cleaned++;
+          // Remove ALL unverified roles (any case)
+          const allUnverifiedRoles = member.roles.cache.filter(
+            (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
+          );
+          for (const [, ur] of allUnverifiedRoles) {
+            await member.roles.remove(ur);
+            console.log(`[Cleanup] ✓ Removed unverified role "${ur.name}" (${ur.id}) from ${member.user.tag}`);
+          }
+
+          // Re-add single canonical Verified role
+          if (verifiedRole) {
+            try {
+              await member.roles.add(verifiedRole);
+              console.log(`[Cleanup] ✓ Added canonical Verified role to ${member.user.tag}`);
+              cleaned++;
+            } catch (err) {
+              console.error(`[Cleanup] ✗ Failed to add Verified to ${member.user.tag}: ${err.message}`);
+            }
+          }
         } catch (err) {
           console.error(`[Cleanup] ✗ Error removing Unverified from ${user.discord_id}: ${err.message}`);
         }
