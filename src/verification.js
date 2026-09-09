@@ -49,6 +49,13 @@ export async function applyVerification(member, user) {
   else if (member.guild.members.me && role.position >= member.guild.members.me.roles.highest.position) warnings.push('Verified role is above my highest role.');
   else {
     try { await member.roles.add(role); } catch { warnings.push('Failed to assign verified role.'); }
+
+    const duplicateVerifiedRoles = member.roles.cache.filter(
+      (r) => r.name.toLowerCase() === config.verifiedRole.toLowerCase() && r.id !== role.id && !r.managed && r.id !== member.guild.id
+    );
+    for (const [, dupRole] of duplicateVerifiedRoles) {
+      try { await member.roles.remove(dupRole); } catch {}
+    }
   }
 
   const nickname = formatNickname(member, user, format);

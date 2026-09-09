@@ -108,6 +108,15 @@ client.once('clientReady', async () => {
             await member.roles.remove(roleToRemove);
             console.log(`[Cleanup] ✓ Removed unverified role "${roleToRemove.name}" (${roleToRemove.id}) from ${member.user.tag}`);
           }
+
+          const duplicateVerifiedRoles = member.roles.cache.filter(
+            (r) => r.name.toLowerCase() === verifiedRoleName && r.id !== verifiedRole.id && !r.managed && r.id !== guild.id
+          );
+          for (const [, dupRole] of duplicateVerifiedRoles) {
+            await member.roles.remove(dupRole);
+            console.log(`[Cleanup] ✓ Removed duplicate Verified role "${dupRole.name}" (${dupRole.id}) from ${member.user.tag}`);
+          }
+
           cleaned++;
         } catch (err) {
           console.error(`[Cleanup] ✗ Error removing Unverified from ${user.discord_id}: ${err.message}`);
