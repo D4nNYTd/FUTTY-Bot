@@ -17,7 +17,7 @@ const allowedGuildIds = config.guildId
 
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
-  client.user.setActivity('Made By D4nNY <:ED:1547249882052436038>', { type: ActivityType.Listening });
+  client.user.setActivity('Made By D4nNYᴱᴰ', { type: ActivityType.Listening });
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
   const route = config.guildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.guildId)
