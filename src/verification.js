@@ -13,16 +13,22 @@ export function formatNickname(member, user, format) {
 function findRole(guild, roleId) {
   if (roleId) {
     const cached = guild.roles.cache.get(roleId);
-    if (cached) return cached;
+    if (cached && !cached.managed && cached.id !== guild.id) return cached;
   }
-  return guild.roles.cache.find((role) => role.name === config.verifiedRole) || null;
+  return guild.roles.cache.find(
+    (role) => role.name === config.verifiedRole && !role.managed && role.id !== guild.id
+  ) || null;
 }
 
 export async function applyVerification(member, user) {
   const settings = guilds.get(member.guild.id);
   const format = settings?.nick_format || config.nickFormat;
-  const role = findRole(member.guild, settings?.role_id);
+  let role = findRole(member.guild, settings?.role_id);
   const warnings = [];
+
+  if (role && (!settings?.role_id || settings.role_id !== role.id)) {
+    guilds.save(member.guild.id, null, role.id);
+  }
 
   if (!role) warnings.push('Verified role not found.');
   else if (member.guild.members.me && role.position >= member.guild.members.me.roles.highest.position) warnings.push('Verified role is above my highest role.');

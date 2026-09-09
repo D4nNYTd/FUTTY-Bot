@@ -27,8 +27,18 @@ client.once('clientReady', async () => {
   setInterval(() => oauthStates.purge(), 60 * 1000);
 });
 
+const allowedGuildIds = config.guildId
+  ? config.guildId.split(',').map((id) => id.trim()).filter(Boolean)
+  : [];
+
 client.on('interactionCreate', async (interaction) => {
   try {
+    if (allowedGuildIds.length > 0 && interaction.guildId && !allowedGuildIds.includes(interaction.guildId)) {
+      if (interaction.isRepliable()) {
+        return interaction.reply({ content: 'This bot is not configured for this server.', flags: MessageFlags.Ephemeral });
+      }
+      return;
+    }
     if (interaction.isButton() && interaction.customId === 'verify') {
       return client.commands.get('verify').execute(interaction);
     }
