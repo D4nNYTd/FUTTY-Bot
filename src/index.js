@@ -11,8 +11,14 @@ client.usersDb = users;
 client.createState = createState;
 client.config = config;
 
+const allowedGuildIds = config.guildId
+  ? config.guildId.split(',').map((id) => id.trim()).filter(Boolean)
+  : [];
+
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+  console.log(`[Cleanup] GUILD_ID env: ${config.guildId || '(not set)'}`);
+  console.log(`[Cleanup] Allowed guilds: ${allowedGuildIds.length > 0 ? allowedGuildIds.join(', ') : '(none - will scan all bot guilds)'}`);
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
   const route = config.guildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.guildId)
@@ -26,7 +32,12 @@ client.once('clientReady', async () => {
   startServer(client, config.port);
   setInterval(() => oauthStates.purge(), 60 * 1000);
 
-  for (const guildId of allowedGuildIds) {
+  const guildIdsToClean = allowedGuildIds.length > 0
+    ? allowedGuildIds
+    : client.guilds.cache.map((g) => g.id);
+  console.log(`[Cleanup] Will check ${guildIdsToClean.length} guild(s)`);
+
+  for (const guildId of guildIdsToClean) {
     try {
       const guild = await client.guilds.fetch(guildId).catch(() => null);
       if (!guild) continue;
@@ -37,7 +48,13 @@ client.once('clientReady', async () => {
       const unverifiedRole = guild.roles.cache.find(
         (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id
       );
-      if (!verifiedRole || !unverifiedRole) continue;
+      if (!verifiedRole) { console.log(`[Cleanup] Verified role not found in ${guild.name}`); continue; }
+      if (!unverifiedRole) { console.log(`[Cleanup] Unverified role not found in ${guild.name}`); continue; }
+      const botMember = guild.members.me;
+      if (botMember && unverifiedRole.position >= botMember.roles.highest.position) {
+        console.log(`[Cleanup] Unverified role is above my highest role in ${guild.name}. Move my role higher.`);
+        continue;
+      }
       const allUsers = users.getAll();
       let cleaned = 0;
       for (const user of allUsers) {
@@ -47,19 +64,19 @@ client.once('clientReady', async () => {
           if (member.roles.cache.has(verifiedRole.id) && member.roles.cache.has(unverifiedRole.id)) {
             await member.roles.remove(unverifiedRole);
             cleaned++;
+            console.log(`[Cleanup] Removed Unverified from ${member.user.tag} in ${guild.name}`);
           }
-        } catch {}
+        } catch (err) {
+          console.error(`[Cleanup] Failed to remove Unverified from ${user.discord_id}:`, err.message);
+        }
       }
-      if (cleaned > 0) console.log(`Removed Unverified role from ${cleaned} members in ${guild.name}`);
+      if (cleaned > 0) console.log(`[Cleanup] Removed Unverified role from ${cleaned} members in ${guild.name}`);
+      else console.log(`[Cleanup] No members needed Unverified removal in ${guild.name}`);
     } catch (error) {
       console.error(`Failed to clean Unverified roles in ${guildId}:`, error);
     }
   }
 });
-
-const allowedGuildIds = config.guildId
-  ? config.guildId.split(',').map((id) => id.trim()).filter(Boolean)
-  : [];
 
 client.on('interactionCreate', async (interaction) => {
   try {
