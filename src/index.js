@@ -85,11 +85,13 @@ client.once('clientReady', async () => {
 
       for (const user of dbUsers) {
         try {
-          const member = await guild.members.fetch(user.discord_id).catch(() => null);
+          const member = await guild.members.fetch({ user: user.discord_id, force: true }).catch(() => null);
           if (!member) {
             fetchFailed++;
             continue;
           }
+          const roleNames = member.roles.cache.map((r) => r.name).join(', ');
+          console.log(`[Cleanup] User ${member.user.tag} roles: [${roleNames}]`);
           const hasVerified = member.roles.cache.has(verifiedRole.id);
           const hasUnverified = member.roles.cache.has(unverifiedRole.id);
 
