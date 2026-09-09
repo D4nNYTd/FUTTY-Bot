@@ -44,9 +44,9 @@ db.run(`
   );
 `);
 
-db.run(`ALTER TABLE guilds ADD COLUMN ticket_role_id TEXT`);
-db.run(`ALTER TABLE guilds ADD COLUMN ticket_category_id TEXT`);
-db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`);
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_role_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_category_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catch {}
 
 const statements = {
   userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
