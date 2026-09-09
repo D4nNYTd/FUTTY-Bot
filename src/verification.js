@@ -30,6 +30,13 @@ export async function applyVerification(member, user) {
     guilds.save(member.guild.id, null, role.id);
   }
 
+  const unverifiedRole = member.guild.roles.cache.find(
+    (r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== member.guild.id
+  );
+  if (unverifiedRole && member.roles.cache.has(unverifiedRole.id)) {
+    try { await member.roles.remove(unverifiedRole); } catch { warnings.push('Failed to remove Unverified role.'); }
+  }
+
   if (!role) warnings.push('Verified role not found.');
   else if (member.guild.members.me && role.position >= member.guild.members.me.roles.highest.position) warnings.push('Verified role is above my highest role.');
   else {
