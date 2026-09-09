@@ -92,21 +92,23 @@ client.once('clientReady', async () => {
           }
           const roleNames = member.roles.cache.map((r) => r.name).join(', ');
           console.log(`[Cleanup] User ${member.user.tag} roles: [${roleNames}]`);
-          const hasVerified = member.roles.cache.has(verifiedRole.id);
-          const hasUnverified = member.roles.cache.has(unverifiedRole.id);
+          const hasVerified = member.roles.cache.some((r) => r.name.toLowerCase() === verifiedRoleName);
+          const memberUnverifiedRoles = member.roles.cache.filter((r) => r.name.toLowerCase() === 'unverified' && !r.managed && r.id !== guild.id);
 
           if (!hasVerified) {
             skippedNotVerified++;
             continue;
           }
-          if (!hasUnverified) {
+          if (memberUnverifiedRoles.size === 0) {
             skippedNoUnverified++;
             continue;
           }
 
-          await member.roles.remove(unverifiedRole);
+          for (const [, roleToRemove] of memberUnverifiedRoles) {
+            await member.roles.remove(roleToRemove);
+            console.log(`[Cleanup] ✓ Removed unverified role "${roleToRemove.name}" (${roleToRemove.id}) from ${member.user.tag}`);
+          }
           cleaned++;
-          console.log(`[Cleanup] ✓ Removed Unverified from ${member.user.tag}`);
         } catch (err) {
           console.error(`[Cleanup] ✗ Error removing Unverified from ${user.discord_id}: ${err.message}`);
         }
