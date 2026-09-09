@@ -76,11 +76,21 @@ const statements = {
 
 const allUsers = db.query('SELECT * FROM users');
 
+function toNamedParams(user) {
+  return {
+    '@discordId': user.discordId ?? user.discord_id,
+    '@robloxId': user.robloxId ?? user.roblox_id,
+    '@username': user.username,
+    '@displayName': user.displayName ?? user.display_name,
+    '@verifiedAt': user.verifiedAt ?? user.verified_at
+  };
+}
+
 export const users = {
   getByDiscord: (id) => statements.userByDiscord.get(id),
   getByRoblox: (id) => statements.userByRoblox.get(id),
   getAll: () => allUsers.all(),
-  save: (user) => statements.saveUser.run(user),
+  save: (user) => statements.saveUser.run(toNamedParams(user)),
   update: (discordId, username, displayName) => statements.updateUser.run(username, displayName, discordId)
 };
 

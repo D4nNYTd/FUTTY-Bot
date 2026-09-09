@@ -66,6 +66,7 @@ export async function refreshAllNicknames(guild) {
 }
 
 export async function verifyMember(member, robloxUser) {
+  if (!robloxUser?.sub) throw new Error('Roblox did not return an account id.');
   const existing = users.getByRoblox(String(robloxUser.sub));
   if (existing && existing.discord_id !== member.id) throw new Error('That Roblox account is already linked to another Discord account.');
   const user = {

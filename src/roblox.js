@@ -15,7 +15,10 @@ export function authorizationUrl(state) {
 
 async function jsonRequest(url, options) {
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`Roblox request failed with status ${response.status}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Roblox returned ${response.status}${body ? `: ${body.slice(0, 300)}` : ''}`);
+  }
   return response.json();
 }
 
