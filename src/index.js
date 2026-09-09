@@ -1,4 +1,4 @@
-import { Client, Collection, EmbedBuilder, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
+import { ActivityType, Client, Collection, EmbedBuilder, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
 import { config } from './config.js';
 import { users, oauthStates } from './db.js';
 import { commands } from './commands/index.js';
@@ -17,6 +17,7 @@ const allowedGuildIds = config.guildId
 
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
+  client.user.setActivity('Made By D4nNY <:ED:1547249882052436038>', { type: ActivityType.Listening });
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
   const route = config.guildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.guildId)
