@@ -47,6 +47,8 @@ db.run(`
 try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_role_id TEXT`); } catch {}
 try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_category_id TEXT`); } catch {}
 try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
+try { db.run(`ALTER TABLE tickets ADD COLUMN number INTEGER`); } catch {}
 
 const statements = {
   userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
@@ -94,11 +96,13 @@ export const users = {
   update: (discordId, username, displayName) => statements.updateUser.run(username, displayName, discordId)
 };
 
-const nextTicketNumber = db.query('SELECT COALESCE(MAX(id), 0) + 1 AS num FROM tickets WHERE guild_id = ?');
-const createTicket = db.query('INSERT INTO tickets (guild_id, channel_id, author_id, created_at) VALUES (?, ?, ?, ?)');
+const nextTicketNumber = db.query('SELECT COALESCE(MAX(number), 0) + 1 AS num FROM tickets WHERE guild_id = ?');
+const createTicket = db.query('INSERT INTO tickets (guild_id, channel_id, author_id, created_at, number) VALUES (?, ?, ?, ?, ?)');
 const ticketByChannel = db.query('SELECT * FROM tickets WHERE channel_id = ?');
 const claimTicket = db.query('UPDATE tickets SET status = \'claimed\', claimed_by = ? WHERE channel_id = ? AND status = \'open\'');
-const closeTicket = db.query('UPDATE tickets SET status = \'closed\', closed_at = ? WHERE channel_id = ?');
+const closeTicket = db.query('UPDATE tickets SET status = \'closed\', closed_at = ?, closed_by = ? WHERE channel_id = ?');
+const openTicketByAuthor = db.query('SELECT * FROM tickets WHERE guild_id = ? AND author_id = ? AND status != \'closed\' LIMIT 1');
+const lastTicketByAuthor = db.query('SELECT created_at FROM tickets WHERE guild_id = ? AND author_id = ? ORDER BY created_at DESC LIMIT 1');
 
 export const guilds = {
   get: (id) => statements.guild.get(id),
@@ -108,10 +112,12 @@ export const guilds = {
 
 export const tickets = {
   nextNumber: (guildId) => nextTicketNumber.get(guildId).num,
-  create: (guildId, channelId, authorId) => createTicket.run(guildId, channelId, authorId, Date.now()),
+  create: (guildId, channelId, authorId, number) => createTicket.run(guildId, channelId, authorId, Date.now(), number),
   getByChannel: (channelId) => ticketByChannel.get(channelId),
   claim: (channelId, userId) => claimTicket.run(userId, channelId),
-  close: (channelId) => closeTicket.run(Date.now(), channelId)
+  close: (channelId, closedBy) => closeTicket.run(Date.now(), closedBy, channelId),
+  getOpenByAuthor: (guildId, authorId) => openTicketByAuthor.get(guildId, authorId),
+  getLastByAuthor: (guildId, authorId) => lastTicketByAuthor.get(guildId, authorId)
 };
 
 export const oauthStates = {

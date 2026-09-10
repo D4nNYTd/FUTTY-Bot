@@ -71,11 +71,11 @@ export async function applyVerification(member, user) {
 export async function refreshAllNicknames(guild) {
   const settings = guilds.get(guild.id);
   const format = settings?.nick_format || config.nickFormat;
-  const results = { updated: 0, failed: 0, errors: [] };
-
-  for (const [discordId, user] of Object.entries(users.getAllForGuild ? users.getAllForGuild() : {})) {
+  const results = { updated: 0, failed: 0 };
+  const allUsers = users.getAll();
+  for (const user of allUsers) {
     try {
-      const member = await guild.members.fetch(discordId).catch(() => null);
+      const member = await guild.members.fetch(user.discord_id).catch(() => null);
       if (!member) continue;
       const nickname = formatNickname(member, { username: user.username, display_name: user.display_name }, format);
       await member.setNickname(nickname);

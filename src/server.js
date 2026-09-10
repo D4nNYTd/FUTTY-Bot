@@ -16,16 +16,16 @@ export function page(title, message, autoClose) {
 export function startServer(client, port) {
   const app = express();
   app.get('/callback', async (request, response) => {
-    if (!robloxConfigured) return response.status(503).send(page('Verification unavailable', 'Roblox verification is not configured yet.'));
-    const { code, state, error, error_description } = request.query;
-    if (error) {
-      console.error(`Roblox OAuth error: ${error}. ${error_description}`);
-      return response.status(400).send(page('Verification failed', `Roblox returned an error: ${error}. ${error_description}`));
-    }
-    if (!code || !state) return response.status(400).send(page('Verification failed', 'The Roblox sign-in was cancelled or incomplete.'));
-    const savedState = oauthStates.consume(state);
-    if (!savedState) return response.status(400).send(page('Verification failed', 'This verification link is invalid or expired.'));
     try {
+      if (!robloxConfigured) return response.status(503).send(page('Verification unavailable', 'Roblox verification is not configured yet.'));
+      const { code, state, error, error_description } = request.query;
+      if (error) {
+        console.error(`Roblox OAuth error: ${error}. ${error_description}`);
+        return response.status(400).send(page('Verification failed', `Roblox returned an error: ${error}. ${error_description}`));
+      }
+      if (!code || !state) return response.status(400).send(page('Verification failed', 'The Roblox sign-in was cancelled or incomplete.'));
+      const savedState = oauthStates.consume(state);
+      if (!savedState) return response.status(400).send(page('Verification failed', 'This verification link is invalid or expired.'));
       const token = await exchangeCode(code);
       const robloxUser = await getUserInfo(token.access_token);
       const guild = await client.guilds.fetch(savedState.guild_id);
@@ -35,8 +35,13 @@ export function startServer(client, port) {
       return response.send(page('Verification complete', details, 5000));
     } catch (caught) {
       console.error(caught);
-      const message = caught.message.includes('already linked') ? caught.message : `Verification failed: ${caught.message}`.slice(0, 300);
-      return response.status(400).send(page('Verification failed', message));
+      const msg = String(caught?.message ?? caught);
+      const display = msg.includes('already linked') ? msg : msg.slice(0, 300);
+      try {
+        return response.status(400).send(page('Verification failed', display));
+      } catch {
+        return response.status(500).end();
+      }
     }
   });
   return app.listen(port, '0.0.0.0', () => console.log(`HTTP server listening on port ${port}`));

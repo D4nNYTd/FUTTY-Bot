@@ -1,9 +1,10 @@
 import { ActivityType, Client, Collection, EmbedBuilder, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
 import { config } from './config.js';
-import { users, oauthStates } from './db.js';
+import { users, oauthStates, tickets } from './db.js';
 import { commands } from './commands/index.js';
 import { createState, applyVerification } from './verification.js';
 import { startServer } from './server.js';
+import { handleTicketCreate, handleTicketClaim, handleTicketClose, handleTicketCloseConfirm, handleTicketCloseCancel } from './tickets.js';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
 client.commands = new Collection(commands.map((command) => [command.data.name, command]));
@@ -18,6 +19,14 @@ const allowedGuildIds = config.guildId
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   client.user.setActivity('Made By D4nNYᴱᴰ', { type: ActivityType.Listening });
+  try {
+    const app = await client.application.fetch();
+    client.botOwnerId = app.owner?.ownerId ?? app.owner?.id ?? null;
+    console.log(`Bot owner: ${client.botOwnerId || '(unknown)'}`);
+  } catch (err) {
+    console.warn('Failed to fetch bot owner:', err.message);
+    client.botOwnerId = null;
+  }
   const rest = new REST({ version: '10' }).setToken(config.discordToken);
   const route = config.guildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.guildId)
@@ -40,8 +49,14 @@ client.on('interactionCreate', async (interaction) => {
       }
       return;
     }
-    if (interaction.isButton() && interaction.customId === 'verify') {
-      return client.commands.get('verify').execute(interaction);
+    if (interaction.isButton()) {
+      if (interaction.customId === 'verify') return client.commands.get('verify').execute(interaction);
+      if (interaction.customId === 'ticket:create') return handleTicketCreate(interaction);
+      if (interaction.customId === 'ticket:claim') return handleTicketClaim(interaction);
+      if (interaction.customId === 'ticket:close') return handleTicketClose(interaction);
+      if (interaction.customId === 'ticket:close-confirm') return handleTicketCloseConfirm(interaction);
+      if (interaction.customId === 'ticket:close-cancel') return handleTicketCloseCancel(interaction);
+      return;
     }
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
@@ -55,6 +70,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.on('guildMemberAdd', async (member) => {
+  if (allowedGuildIds.length > 0 && !allowedGuildIds.includes(member.guild.id)) return;
   const linked = users.getByDiscord(member.id);
   if (!linked) return;
   try {
@@ -67,6 +83,15 @@ client.on('guildMemberAdd', async (member) => {
   } catch (error) {
     console.error(error);
   }
+});
+
+client.on('channelDelete', async (channel) => {
+  try {
+    const ticket = tickets.getByChannel(channel.id);
+    if (ticket && ticket.status !== 'closed') {
+      tickets.close(channel.id, null);
+    }
+  } catch {}
 });
 
 client.login(config.discordToken);

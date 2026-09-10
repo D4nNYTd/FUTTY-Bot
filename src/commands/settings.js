@@ -1,20 +1,22 @@
 import { ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { admins, guilds, users } from '../db.js';
 import { isAdmin } from '../permissions.js';
-import { postPanel } from '../panel.js';
 import { formatNickname } from '../verification.js';
 
 const command = new SlashCommandBuilder().setName('settings').setDescription('Manage verification settings.')
   .addSubcommand((sub) => sub.setName('nick').setDescription('Set the nickname format.').addStringOption((option) => option.setName('format').setDescription('Use {roblox}, {display}, or {discord}.').setRequired(true)))
   .addSubcommand((sub) => sub.setName('role').setDescription('Set the verified role.').addRoleOption((option) => option.setName('role').setDescription('The verified role.').setRequired(true)))
-  .addSubcommand((sub) => sub.setName('panel').setDescription('Post the verification panel.').addChannelOption((option) => option.setName('channel').setDescription('A text channel.').addChannelTypes(ChannelType.GuildText).setRequired(true)).addStringOption((option) => option.setName('help_url').setDescription('Optional help link.').setRequired(false)))
   .addSubcommand((sub) => sub.setName('admin').setDescription('Manage settings administrators.').addStringOption((option) => option.setName('action').setDescription('The action.').setRequired(true).addChoices({ name: 'add', value: 'add' }, { name: 'remove', value: 'remove' }, { name: 'list', value: 'list' })).addMentionableOption((option) => option.setName('target').setDescription('A role or member.').setRequired(false)))
-  .addSubcommand((sub) => sub.setName('show').setDescription('Show current verification settings.'));
+  .addSubcommand((sub) => sub.setName('show').setDescription('Show current verification settings.'))
+  .addSubcommandGroup((group) => group.setName('ticket').setDescription('Manage ticket settings.')
+    .addSubcommand((sub) => sub.setName('role').setDescription('Set the support role for tickets.').addRoleOption((o) => o.setName('role').setDescription('Support role').setRequired(true)))
+    .addSubcommand((sub) => sub.setName('category').setDescription('Set the ticket category.').addChannelOption((o) => o.setName('category').setDescription('Category').addChannelTypes(ChannelType.GuildCategory).setRequired(true)))
+    .addSubcommand((sub) => sub.setName('log').setDescription('Set the ticket log channel.').addChannelOption((o) => o.setName('channel').setDescription('Log channel').addChannelTypes(ChannelType.GuildText).setRequired(true))));
 
 export default {
-  data: command,
+  data: command.setDMPermission(false),
   async execute(interaction) {
-    if (!isAdmin(interaction.member)) return interaction.reply({ content: 'You do not have permission to manage verification settings.', flags: MessageFlags.Ephemeral });
+    if (!isAdmin(interaction.member, interaction.client.botOwnerId)) return interaction.reply({ content: 'You do not have permission to manage verification settings.', flags: MessageFlags.Ephemeral });
     const subcommand = interaction.options.getSubcommand();
     const current = guilds.get(interaction.guildId);
     if (subcommand === 'nick') {
@@ -22,7 +24,7 @@ export default {
       if (!format.includes('{roblox}') && !format.includes('{display}')) return interaction.reply({ content: 'The format must contain {roblox} or {display}.', flags: MessageFlags.Ephemeral });
       guilds.save(interaction.guildId, format, null);
       const preview = format.replaceAll('{roblox}', 'Builderman').replaceAll('{display}', 'Builder Man').replaceAll('{discord}', interaction.user.username).slice(0, 32);
-      await interaction.reply({ content: `Nickname format saved. Preview: ${preview}\nUpdating verified members...`, flags: MessageFlags.Ephemeral });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       
       let updated = 0;
       let failed = 0;
@@ -38,26 +40,54 @@ export default {
           failed++;
         }
       }
-      return interaction.followUp({ content: `Updated ${updated} members. ${failed > 0 ? `${failed} failed.` : ''}`, flags: MessageFlags.Ephemeral });
+      return interaction.editReply({ content: `Nickname format saved. Preview: ${preview}\nUpdated ${updated} members. ${failed > 0 ? `${failed} failed.` : ''}` });
     }
     if (subcommand === 'role') {
       const role = interaction.options.getRole('role');
       guilds.save(interaction.guildId, null, role.id);
       return interaction.reply({ content: `Verified role set to ${role}.`, flags: MessageFlags.Ephemeral });
     }
-    if (subcommand === 'panel') {
-      await postPanel(interaction.options.getChannel('channel'), interaction.options.getString('help_url'));
-      return interaction.reply({ content: 'Verification panel posted.', flags: MessageFlags.Ephemeral });
-    }
+
     if (subcommand === 'show') {
-      return interaction.reply({ content: `Nickname format: ${current?.nick_format || interaction.client.config.nickFormat}\nVerified role: ${current?.role_id ? `<@&${current.role_id}>` : interaction.client.config.verifiedRole}`, flags: MessageFlags.Ephemeral });
+      const lines = [
+        `Nickname format: ${current?.nick_format || interaction.client.config.nickFormat}`,
+        `Verified role: ${current?.role_id ? `<@&${current.role_id}>` : interaction.client.config.verifiedRole}`,
+        `Ticket role: ${current?.ticket_role_id ? `<@&${current.ticket_role_id}>` : '(not set)'}`,
+        `Ticket category: ${current?.ticket_category_id ? `<#${current.ticket_category_id}>` : '(not set)'}`,
+        `Ticket log: ${current?.ticket_log_channel_id ? `<#${current.ticket_log_channel_id}>` : '(not set)'}`
+      ];
+      return interaction.reply({ content: lines.join('\n'), flags: MessageFlags.Ephemeral });
+    }
+    const subcommandGroup = interaction.options.getSubcommandGroup();
+    if (subcommandGroup === 'ticket') {
+      const ticketSub = interaction.options.getSubcommand();
+      if (ticketSub === 'role') {
+        const role = interaction.options.getRole('role');
+        guilds.save(interaction.guildId, null, null, role.id);
+        return interaction.reply({ content: `Ticket support role set to ${role}.`, flags: MessageFlags.Ephemeral });
+      }
+      if (ticketSub === 'category') {
+        const cat = interaction.options.getChannel('category');
+        guilds.save(interaction.guildId, null, null, null, cat.id);
+        return interaction.reply({ content: `Ticket category set to ${cat}.`, flags: MessageFlags.Ephemeral });
+      }
+      if (ticketSub === 'log') {
+        const ch = interaction.options.getChannel('channel');
+        guilds.save(interaction.guildId, null, null, null, null, ch.id);
+        return interaction.reply({ content: `Ticket log channel set to ${ch}.`, flags: MessageFlags.Ephemeral });
+      }
     }
     const action = interaction.options.getString('action');
     if (action === 'list') return interaction.reply({ content: admins.list(interaction.guildId).map((id) => `<@&${id}> or <@${id}>`).join('\n') || 'No additional administrators configured.', flags: MessageFlags.Ephemeral });
     const target = interaction.options.getMentionable('target');
     if (!target) return interaction.reply({ content: 'Choose a role or member.', flags: MessageFlags.Ephemeral });
-    if (action === 'add') admins.add(interaction.guildId, target.id);
-    else admins.remove(interaction.guildId, target.id);
+    if (action === 'add') {
+      if ('id' in target && target.id === interaction.guild.id) return interaction.reply({ content: 'Cannot add @everyone as administrator.', flags: MessageFlags.Ephemeral });
+      if ('managed' in target && target.managed) return interaction.reply({ content: 'Cannot add a managed role as administrator.', flags: MessageFlags.Ephemeral });
+      admins.add(interaction.guildId, target.id);
+    } else {
+      admins.remove(interaction.guildId, target.id);
+    }
     return interaction.reply({ content: `Administrator ${action === 'add' ? 'added' : 'removed'}.`, flags: MessageFlags.Ephemeral });
   }
 };
