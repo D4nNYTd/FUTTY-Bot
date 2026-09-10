@@ -1,5 +1,5 @@
 import { ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { admins, guilds, users } from '../db.js';
+import { admins, guilds, ticketRoles, users } from '../db.js';
 import { isAdmin } from '../permissions.js';
 import { formatNickname } from '../verification.js';
 
@@ -9,7 +9,7 @@ const command = new SlashCommandBuilder().setName('settings').setDescription('Ma
   .addSubcommand((sub) => sub.setName('admin').setDescription('Manage settings administrators.').addStringOption((option) => option.setName('action').setDescription('The action.').setRequired(true).addChoices({ name: 'add', value: 'add' }, { name: 'remove', value: 'remove' }, { name: 'list', value: 'list' })).addMentionableOption((option) => option.setName('target').setDescription('A role or member.').setRequired(false)))
   .addSubcommand((sub) => sub.setName('show').setDescription('Show current verification settings.'))
   .addSubcommandGroup((group) => group.setName('ticket').setDescription('Manage ticket settings.')
-    .addSubcommand((sub) => sub.setName('role').setDescription('Set the support role for tickets.').addRoleOption((o) => o.setName('role').setDescription('Support role').setRequired(true)))
+    .addSubcommand((sub) => sub.setName('role').setDescription('Add or remove a support role for tickets.').addStringOption((o) => o.setName('action').setDescription('Action').setRequired(true).addChoices({ name: 'add', value: 'add' }, { name: 'remove', value: 'remove' }, { name: 'list', value: 'list' })).addRoleOption((o) => o.setName('role').setDescription('Support role').setRequired(false)))
     .addSubcommand((sub) => sub.setName('category').setDescription('Set the ticket category.').addChannelOption((o) => o.setName('category').setDescription('Category').addChannelTypes(ChannelType.GuildCategory).setRequired(true)))
     .addSubcommand((sub) => sub.setName('log').setDescription('Set the ticket log channel.').addChannelOption((o) => o.setName('channel').setDescription('Log channel').addChannelTypes(ChannelType.GuildText).setRequired(true))));
 
@@ -52,7 +52,7 @@ export default {
       const lines = [
         `Nickname format: ${current?.nick_format || interaction.client.config.nickFormat}`,
         `Verified role: ${current?.role_id ? `<@&${current.role_id}>` : interaction.client.config.verifiedRole}`,
-        `Ticket role: ${current?.ticket_role_id ? `<@&${current.ticket_role_id}>` : '(not set)'}`,
+        `Ticket roles: ${ticketRoles.list(interaction.guildId).map((id) => `<@&${id}>`).join(', ') || '(none)'}`,
         `Ticket category: ${current?.ticket_category_id ? `<#${current.ticket_category_id}>` : '(not set)'}`,
         `Ticket log: ${current?.ticket_log_channel_id ? `<#${current.ticket_log_channel_id}>` : '(not set)'}`
       ];
@@ -62,9 +62,20 @@ export default {
     if (subcommandGroup === 'ticket') {
       const ticketSub = interaction.options.getSubcommand();
       if (ticketSub === 'role') {
+        const action = interaction.options.getString('action');
+        if (action === 'list') {
+          const roles = ticketRoles.list(interaction.guildId);
+          return interaction.reply({ content: roles.length ? `Ticket support roles: ${roles.map((id) => `<@&${id}>`).join(', ')}` : 'No ticket support roles configured.', flags: MessageFlags.Ephemeral });
+        }
         const role = interaction.options.getRole('role');
-        guilds.save(interaction.guildId, null, null, role.id);
-        return interaction.reply({ content: `Ticket support role set to ${role}.`, flags: MessageFlags.Ephemeral });
+        if (!role) return interaction.reply({ content: 'Specify a role for add/remove.', flags: MessageFlags.Ephemeral });
+        if (action === 'add') {
+          if (role.managed) return interaction.reply({ content: 'Cannot add a managed role.', flags: MessageFlags.Ephemeral });
+          ticketRoles.add(interaction.guildId, role.id);
+          return interaction.reply({ content: `Added ${role} as ticket support role.`, flags: MessageFlags.Ephemeral });
+        }
+        ticketRoles.remove(interaction.guildId, role.id);
+        return interaction.reply({ content: `Removed ${role} from ticket support roles.`, flags: MessageFlags.Ephemeral });
       }
       if (ticketSub === 'category') {
         const cat = interaction.options.getChannel('category');

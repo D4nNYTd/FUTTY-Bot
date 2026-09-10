@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { guilds, tickets, users } from './db.js';
+import { guilds, ticketRoles, tickets, users } from './db.js';
 import { isAdmin } from './permissions.js';
 
 const COOLDOWN_MS = 10 * 60 * 1000;
@@ -30,6 +30,12 @@ export function buildTicketPanelRow() {
   );
 }
 
+function hasTicketAccess(member, botOwnerId) {
+  const roles = ticketRoles.list(member.guild.id);
+  if (roles.some((roleId) => member.roles.cache.has(roleId))) return true;
+  return isAdmin(member, botOwnerId);
+}
+
 export async function handleTicketCreate(interaction) {
   const settings = guilds.get(interaction.guildId);
   const existing = tickets.getOpenByAuthor(interaction.guildId, interaction.user.id);
@@ -48,13 +54,14 @@ export async function handleTicketCreate(interaction) {
   const padded = String(number).padStart(4, '0');
   const channelName = `ticket-${padded}-${interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20)}`;
 
+  const supportRoleIds = ticketRoles.list(interaction.guildId);
   const permissionOverwrites = [
     { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
     { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
   ];
-  if (settings?.ticket_role_id) {
-    permissionOverwrites.push({ id: settings.ticket_role_id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
+  for (const roleId of supportRoleIds) {
+    permissionOverwrites.push({ id: roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
   }
 
   let channel;
@@ -100,9 +107,7 @@ export async function handleTicketCreate(interaction) {
 }
 
 export async function handleTicketClaim(interaction) {
-  const settings = guilds.get(interaction.guildId);
-  const hasRole = settings?.ticket_role_id && interaction.member.roles.cache.has(settings.ticket_role_id);
-  if (!hasRole && !isAdmin(interaction.member, interaction.client.botOwnerId)) {
+  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
     return interaction.reply({ content: 'You do not have permission to claim this ticket.', flags: MessageFlags.Ephemeral });
   }
 
@@ -122,6 +127,9 @@ export async function handleTicketClaim(interaction) {
 }
 
 export async function handleTicketClose(interaction) {
+  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
+    return interaction.reply({ content: 'You do not have permission to close this ticket.', flags: MessageFlags.Ephemeral });
+  }
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:close-confirm').setLabel('Confirm close').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('ticket:close-cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
@@ -130,6 +138,9 @@ export async function handleTicketClose(interaction) {
 }
 
 export async function handleTicketCloseConfirm(interaction) {
+  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
+    return interaction.reply({ content: 'You do not have permission to close this ticket.', flags: MessageFlags.Ephemeral });
+  }
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const ticket = tickets.getByChannel(interaction.channelId);

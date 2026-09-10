@@ -50,12 +50,19 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
     if (interaction.isButton()) {
-      if (interaction.customId === 'verify') return client.commands.get('verify').execute(interaction);
-      if (interaction.customId === 'ticket:create') return handleTicketCreate(interaction);
-      if (interaction.customId === 'ticket:claim') return handleTicketClaim(interaction);
-      if (interaction.customId === 'ticket:close') return handleTicketClose(interaction);
-      if (interaction.customId === 'ticket:close-confirm') return handleTicketCloseConfirm(interaction);
-      if (interaction.customId === 'ticket:close-cancel') return handleTicketCloseCancel(interaction);
+      try {
+        if (interaction.customId === 'verify') return await client.commands.get('verify').execute(interaction);
+        if (interaction.customId === 'ticket:create') return await handleTicketCreate(interaction);
+        if (interaction.customId === 'ticket:claim') return await handleTicketClaim(interaction);
+        if (interaction.customId === 'ticket:close') return await handleTicketClose(interaction);
+        if (interaction.customId === 'ticket:close-confirm') return await handleTicketCloseConfirm(interaction);
+        if (interaction.customId === 'ticket:close-cancel') return await handleTicketCloseCancel(interaction);
+      } catch (err) {
+        console.error(`Button handler error (${interaction.customId}):`, err);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: 'Something went wrong.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
+      }
       return;
     }
     if (!interaction.isChatInputCommand()) return;

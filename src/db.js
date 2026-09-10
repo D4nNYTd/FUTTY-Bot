@@ -50,6 +50,18 @@ try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catc
 try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
 try { db.run(`ALTER TABLE tickets ADD COLUMN number INTEGER`); } catch {}
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS ticket_roles (
+    guild_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+  );
+`);
+
+const addTicketRole = db.query('INSERT OR IGNORE INTO ticket_roles (guild_id, role_id) VALUES (?, ?)');
+const removeTicketRole = db.query('DELETE FROM ticket_roles WHERE guild_id = ? AND role_id = ?');
+const listTicketRoles = db.query('SELECT role_id FROM ticket_roles WHERE guild_id = ?');
+
 const statements = {
   userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
   userByRoblox: db.query('SELECT * FROM users WHERE roblox_id = ?'),
@@ -106,8 +118,14 @@ const lastTicketByAuthor = db.query('SELECT created_at FROM tickets WHERE guild_
 
 export const guilds = {
   get: (id) => statements.guild.get(id),
-  save: (id, nickFormat = null, roleId = null, ticketRoleId = null, ticketCategoryId = null, ticketLogChannelId = null) =>
-    statements.saveGuild.run(id, nickFormat, roleId, ticketRoleId, ticketCategoryId, ticketLogChannelId)
+  save: (id, nickFormat = null, roleId = null, ticketCategoryId = null, ticketLogChannelId = null) =>
+    statements.saveGuild.run(id, nickFormat, roleId, null, ticketCategoryId, ticketLogChannelId)
+};
+
+export const ticketRoles = {
+  add: (guildId, roleId) => addTicketRole.run(guildId, roleId),
+  remove: (guildId, roleId) => removeTicketRole.run(guildId, roleId),
+  list: (guildId) => listTicketRoles.all(guildId).map((r) => r.role_id)
 };
 
 export const tickets = {
