@@ -1,10 +1,9 @@
 import { ActivityType, Client, Collection, EmbedBuilder, GatewayIntentBits, MessageFlags, REST, Routes } from 'discord.js';
 import { config } from './config.js';
-import { users, oauthStates, tickets } from './db.js';
+import { users, oauthStates } from './db.js';
 import { commands } from './commands/index.js';
 import { createState, applyVerification } from './verification.js';
 import { startServer } from './server.js';
-import { handleTicketCreate, handleTicketClaim, handleTicketClose, handleTicketCloseConfirm, handleTicketCloseCancel } from './tickets.js';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
 client.commands = new Collection(commands.map((command) => [command.data.name, command]));
@@ -49,21 +48,8 @@ client.on('interactionCreate', async (interaction) => {
       }
       return;
     }
-    if (interaction.isButton()) {
-      try {
-        if (interaction.customId === 'verify') return await client.commands.get('verify').execute(interaction);
-        if (interaction.customId === 'ticket:create') return await handleTicketCreate(interaction);
-        if (interaction.customId === 'ticket:claim') return await handleTicketClaim(interaction);
-        if (interaction.customId === 'ticket:close') return await handleTicketClose(interaction);
-        if (interaction.customId === 'ticket:close-confirm') return await handleTicketCloseConfirm(interaction);
-        if (interaction.customId === 'ticket:close-cancel') return await handleTicketCloseCancel(interaction);
-      } catch (err) {
-        console.error(`Button handler error (${interaction.customId}):`, err);
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: 'Something went wrong.', flags: MessageFlags.Ephemeral }).catch(() => {});
-        }
-      }
-      return;
+    if (interaction.isButton() && interaction.customId === 'verify') {
+      return await client.commands.get('verify').execute(interaction);
     }
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
@@ -85,15 +71,6 @@ client.on('guildMemberAdd', async (member) => {
   } catch (error) {
     console.error(error);
   }
-});
-
-client.on('channelDelete', async (channel) => {
-  try {
-    const ticket = tickets.getByChannel(channel.id);
-    if (ticket && ticket.status !== 'closed') {
-      tickets.close(channel.id, null);
-    }
-  } catch {}
 });
 
 client.login(config.discordToken);
