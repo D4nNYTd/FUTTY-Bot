@@ -44,6 +44,7 @@ export default {
     }
     if (subcommand === 'role') {
       const role = interaction.options.getRole('role');
+      if (!role) return interaction.reply({ content: 'Please specify a role.', flags: MessageFlags.Ephemeral });
       guilds.save(interaction.guildId, null, role.id);
       return interaction.reply({ content: `Verified role set to ${role}.`, flags: MessageFlags.Ephemeral });
     }
@@ -79,12 +80,12 @@ export default {
       }
       if (ticketSub === 'category') {
         const cat = interaction.options.getChannel('category');
-        guilds.save(interaction.guildId, null, null, null, cat.id);
+        guilds.save(interaction.guildId, null, null, cat.id);
         return interaction.reply({ content: `Ticket category set to ${cat}.`, flags: MessageFlags.Ephemeral });
       }
       if (ticketSub === 'log') {
         const ch = interaction.options.getChannel('channel');
-        guilds.save(interaction.guildId, null, null, null, null, ch.id);
+        guilds.save(interaction.guildId, null, null, null, ch.id);
         return interaction.reply({ content: `Ticket log channel set to ${ch}.`, flags: MessageFlags.Ephemeral });
       }
     }
