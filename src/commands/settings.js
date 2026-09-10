@@ -71,9 +71,15 @@ export default {
         const role = interaction.options.getRole('role');
         if (!role) return interaction.reply({ content: 'Specify a role for add/remove.', flags: MessageFlags.Ephemeral });
         if (action === 'add') {
+          if (role.id === interaction.guild.id) return interaction.reply({ content: 'Cannot add @everyone as a ticket support role.', flags: MessageFlags.Ephemeral });
           if (role.managed) return interaction.reply({ content: 'Cannot add a managed role.', flags: MessageFlags.Ephemeral });
+          let notice = '';
+          if (current?.role_id === role.id) {
+            guilds.clearVerifiedRole(interaction.guildId);
+            notice = ' This role was wrongly saved as the verified role and has been cleared — set the verified role with /settings role.';
+          }
           ticketRoles.add(interaction.guildId, role.id);
-          return interaction.reply({ content: `Added ${role} as ticket support role.`, flags: MessageFlags.Ephemeral });
+          return interaction.reply({ content: `Added ${role} as ticket support role.${notice}`, flags: MessageFlags.Ephemeral });
         }
         ticketRoles.remove(interaction.guildId, role.id);
         return interaction.reply({ content: `Removed ${role} from ticket support roles.`, flags: MessageFlags.Ephemeral });

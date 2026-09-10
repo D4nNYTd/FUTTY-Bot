@@ -69,7 +69,7 @@ export async function handleTicketCreate(interaction) {
     channel = await interaction.guild.channels.create({
       name: channelName,
       type: ChannelType.GuildText,
-      parent: settings?.ticket_category_id || undefined,
+      parent: parentId,
       permissionOverwrites
     });
   } catch (err) {
