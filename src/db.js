@@ -58,6 +58,11 @@ db.run(`
   );
 `);
 
+db.run(`
+  UPDATE guilds SET role_id = NULL
+  WHERE role_id IN (SELECT role_id FROM ticket_roles WHERE ticket_roles.guild_id = guilds.guild_id)
+`);
+
 const addTicketRole = db.query('INSERT OR IGNORE INTO ticket_roles (guild_id, role_id) VALUES (?, ?)');
 const removeTicketRole = db.query('DELETE FROM ticket_roles WHERE guild_id = ? AND role_id = ?');
 const listTicketRoles = db.query('SELECT role_id FROM ticket_roles WHERE guild_id = ?');
