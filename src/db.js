@@ -50,13 +50,18 @@ try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catc
 try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
 try { db.run(`ALTER TABLE tickets ADD COLUMN number INTEGER`); } catch {}
 
-db.run(`
-  CREATE TABLE IF NOT EXISTS ticket_roles (
-    guild_id TEXT NOT NULL,
-    role_id TEXT NOT NULL,
-    PRIMARY KEY (guild_id, role_id)
-  );
-`);
+// Ensure ticket_roles table exists (idempotent migration)
+try {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ticket_roles (
+      guild_id TEXT NOT NULL,
+      role_id TEXT NOT NULL,
+      PRIMARY KEY (guild_id, role_id)
+    )
+  `);
+} catch (err) {
+  console.error('[DB] Failed to create ticket_roles table:', err.message);
+}
 
 const addTicketRole = db.query('INSERT OR IGNORE INTO ticket_roles (guild_id, role_id) VALUES (?, ?)');
 const removeTicketRole = db.query('DELETE FROM ticket_roles WHERE guild_id = ? AND role_id = ?');
@@ -122,9 +127,27 @@ export const guilds = {
 };
 
 export const ticketRoles = {
-  add: (guildId, roleId) => addTicketRole.run(guildId, roleId),
+  add: (guildId, roleId) => {
+    try {
+      const result = addTicketRole.run(guildId, roleId);
+      console.log(`[DB] ticketRoles.add(${guildId}, ${roleId}) -> changes: ${result.changes}`);
+      return result;
+    } catch (err) {
+      console.error(`[DB] ticketRoles.add failed:`, err.message);
+      throw err;
+    }
+  },
   remove: (guildId, roleId) => removeTicketRole.run(guildId, roleId),
-  list: (guildId) => listTicketRoles.all(guildId).map((r) => r.role_id)
+  list: (guildId) => {
+    try {
+      const rows = listTicketRoles.all(guildId);
+      console.log(`[DB] ticketRoles.list(${guildId}) -> ${rows.length} roles`);
+      return rows.map((r) => r.role_id);
+    } catch (err) {
+      console.error(`[DB] ticketRoles.list failed:`, err.message);
+      return [];
+    }
+  }
 };
 
 export const tickets = {
