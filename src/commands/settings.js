@@ -66,17 +66,17 @@ export default {
         const action = interaction.options.getString('action');
         if (action === 'list') {
           const roles = ticketRoles.list(interaction.guildId);
-          return interaction.reply({ content: roles.length ? `Ticket support roles: ${roles.map((id) => `<@&${id}>`).join(', ')}` : 'No ticket support roles configured.', flags: MessageFlags.Ephemeral });
+          return interaction.reply({ content: roles.length ? `Ticket staff roles (can view & manage tickets): ${roles.map((id) => `<@&${id}>`).join(', ')}` : 'No ticket staff roles configured. Use /settings ticket role add to add one.', flags: MessageFlags.Ephemeral });
         }
         const role = interaction.options.getRole('role');
         if (!role) return interaction.reply({ content: 'Specify a role for add/remove.', flags: MessageFlags.Ephemeral });
         if (action === 'add') {
           if (role.managed) return interaction.reply({ content: 'Cannot add a managed role.', flags: MessageFlags.Ephemeral });
           ticketRoles.add(interaction.guildId, role.id);
-          return interaction.reply({ content: `Added ${role} as ticket support role.`, flags: MessageFlags.Ephemeral });
+          return interaction.reply({ content: `Added ${role} as ticket staff role. Members with this role can view and manage tickets.`, flags: MessageFlags.Ephemeral });
         }
         ticketRoles.remove(interaction.guildId, role.id);
-        return interaction.reply({ content: `Removed ${role} from ticket support roles.`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: `Removed ${role} from ticket staff roles. Members with this role can no longer access tickets.`, flags: MessageFlags.Ephemeral });
       }
       if (ticketSub === 'category') {
         const cat = interaction.options.getChannel('category');
