@@ -32,7 +32,35 @@ db.run(`
     guild_id TEXT NOT NULL,
     expires_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL UNIQUE,
+    author_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    claimed_by TEXT,
+    created_at INTEGER NOT NULL,
+    closed_at INTEGER
+  );
 `);
+
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_role_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_category_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catch {}
+try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
+try { db.run(`ALTER TABLE tickets ADD COLUMN number INTEGER`); } catch {}
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ticket_roles (
+    guild_id TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+  );
+`);
+
+const addTicketRole = db.query('INSERT OR IGNORE INTO ticket_roles (guild_id, role_id) VALUES (?, ?)');
+const removeTicketRole = db.query('DELETE FROM ticket_roles WHERE guild_id = ? AND role_id = ?');
+const listTicketRoles = db.query('SELECT role_id FROM ticket_roles WHERE guild_id = ?');
 
 const statements = {
   userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
@@ -43,10 +71,12 @@ const statements = {
     display_name = excluded.display_name, verified_at = excluded.verified_at`),
   updateUser: db.query('UPDATE users SET username = ?, display_name = ? WHERE discord_id = ?'),
   guild: db.query('SELECT * FROM guilds WHERE guild_id = ?'),
-  saveGuild: db.query(`INSERT INTO guilds (guild_id, nick_format, role_id) VALUES (?, ?, ?)
+  saveGuild: db.query(`INSERT INTO guilds (guild_id, nick_format, role_id, ticket_category_id, ticket_log_channel_id) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(guild_id) DO UPDATE SET
       nick_format = COALESCE(excluded.nick_format, guilds.nick_format),
-      role_id = COALESCE(excluded.role_id, guilds.role_id)`),
+      role_id = COALESCE(excluded.role_id, guilds.role_id),
+      ticket_category_id = COALESCE(excluded.ticket_category_id, guilds.ticket_category_id),
+      ticket_log_channel_id = COALESCE(excluded.ticket_log_channel_id, guilds.ticket_log_channel_id)`),
   state: db.query('SELECT * FROM oauth_states WHERE state = ? AND expires_at > ?'),
   saveState: db.query('INSERT INTO oauth_states (state, discord_id, guild_id, expires_at) VALUES (?, ?, ?, ?)'),
   deleteState: db.query('DELETE FROM oauth_states WHERE state = ?'),
@@ -77,9 +107,34 @@ export const users = {
   update: (discordId, username, displayName) => statements.updateUser.run(username, displayName, discordId)
 };
 
+const nextTicketNumber = db.query('SELECT COALESCE(MAX(number), 0) + 1 AS num FROM tickets WHERE guild_id = ?');
+const createTicket = db.query('INSERT INTO tickets (guild_id, channel_id, author_id, created_at, number) VALUES (?, ?, ?, ?, ?)');
+const ticketByChannel = db.query('SELECT * FROM tickets WHERE channel_id = ?');
+const claimTicket = db.query('UPDATE tickets SET status = \'claimed\', claimed_by = ? WHERE channel_id = ? AND status = \'open\'');
+const closeTicket = db.query('UPDATE tickets SET status = \'closed\', closed_at = ?, closed_by = ? WHERE channel_id = ?');
+const openTicketByAuthor = db.query('SELECT * FROM tickets WHERE guild_id = ? AND author_id = ? AND status != \'closed\' LIMIT 1');
+const lastTicketByAuthor = db.query('SELECT created_at FROM tickets WHERE guild_id = ? AND author_id = ? ORDER BY created_at DESC LIMIT 1');
+
 export const guilds = {
   get: (id) => statements.guild.get(id),
-  save: (id, nickFormat = null, roleId = null) => statements.saveGuild.run(id, nickFormat, roleId)
+  save: (id, nickFormat = null, roleId = null, ticketCategoryId = null, ticketLogChannelId = null) =>
+    statements.saveGuild.run(id, nickFormat, roleId, ticketCategoryId, ticketLogChannelId)
+};
+
+export const ticketRoles = {
+  add: (guildId, roleId) => addTicketRole.run(guildId, roleId),
+  remove: (guildId, roleId) => removeTicketRole.run(guildId, roleId),
+  list: (guildId) => listTicketRoles.all(guildId).map((r) => r.role_id)
+};
+
+export const tickets = {
+  nextNumber: (guildId) => nextTicketNumber.get(guildId).num,
+  create: (guildId, channelId, authorId, number) => createTicket.run(guildId, channelId, authorId, Date.now(), number),
+  getByChannel: (channelId) => ticketByChannel.get(channelId),
+  claim: (channelId, userId) => claimTicket.run(userId, channelId),
+  close: (channelId, closedBy) => closeTicket.run(Date.now(), closedBy, channelId),
+  getOpenByAuthor: (guildId, authorId) => openTicketByAuthor.get(guildId, authorId),
+  getLastByAuthor: (guildId, authorId) => lastTicketByAuthor.get(guildId, authorId)
 };
 
 export const oauthStates = {
