@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { oauthStates } from '../db.js';
+import { oauthStates, users } from '../db.js';
 import { authorizationUrl } from '../roblox.js';
 import { applyVerification } from '../verification.js';
 import { robloxConfigured } from '../config.js';
@@ -8,7 +8,7 @@ export default {
   data: new SlashCommandBuilder().setName('verify').setDescription('Link your Roblox account.').setDMPermission(false),
   async execute(interaction) {
     if (!robloxConfigured) return interaction.reply({ content: 'Roblox verification is not configured yet.', flags: MessageFlags.Ephemeral });
-    const existing = interaction.client.usersDb.getByDiscord(interaction.user.id);
+    const existing = users.getByDiscord(interaction.user.id);
     if (existing) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const result = await applyVerification(interaction.member, { username: existing.username, display_name: existing.display_name });
