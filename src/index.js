@@ -8,7 +8,6 @@ import { handleTicketCreate, handleTicketClaim, handleTicketClose, handleTicketC
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
 client.commands = new Collection(commands.map((command) => [command.data.name, command]));
-client.usersDb = users;
 client.createState = createState;
 client.config = config;
 
@@ -100,5 +99,7 @@ client.on('channelDelete', async (channel) => {
     }
   } catch {}
 });
+
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
 
 client.login(config.discordToken);

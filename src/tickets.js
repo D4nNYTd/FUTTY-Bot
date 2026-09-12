@@ -30,10 +30,6 @@ export function buildTicketPanelRow() {
   );
 }
 
-function hasTicketAccess(member, botOwnerId) {
-  return isAdmin(member, botOwnerId);
-}
-
 export async function handleTicketCreate(interaction) {
   const settings = guilds.get(interaction.guildId);
   const existing = tickets.getOpenByAuthor(interaction.guildId, interaction.user.id);
@@ -48,7 +44,8 @@ export async function handleTicketCreate(interaction) {
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const number = tickets.nextNumber(interaction.guildId);
+  // Reserve ticket number atomically before creating channel
+  const number = tickets.create(interaction.guildId, '__pending__', interaction.user.id);
   const padded = String(number).padStart(4, '0');
   const channelName = `ticket-${padded}-${interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20)}`;
 
@@ -70,7 +67,8 @@ export async function handleTicketCreate(interaction) {
     return interaction.editReply({ content: `Failed to create ticket channel: ${err.message}` });
   }
 
-  tickets.create(interaction.guildId, channel.id, interaction.user.id, number);
+  // Update placeholder with real channel ID
+  tickets.updateChannel('__pending__', channel.id);
 
   const linked = users.getByDiscord(interaction.user.id);
   const fields = [];
@@ -101,7 +99,7 @@ export async function handleTicketCreate(interaction) {
 }
 
 export async function handleTicketClaim(interaction) {
-  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
+  if (!isAdmin(interaction.member, interaction.client.botOwnerId)) {
     return interaction.reply({ content: 'You do not have permission to claim this ticket.', flags: MessageFlags.Ephemeral });
   }
 
@@ -121,7 +119,7 @@ export async function handleTicketClaim(interaction) {
 }
 
 export async function handleTicketClose(interaction) {
-  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
+  if (!isAdmin(interaction.member, interaction.client.botOwnerId)) {
     return interaction.reply({ content: 'You do not have permission to close this ticket.', flags: MessageFlags.Ephemeral });
   }
   const row = new ActionRowBuilder().addComponents(
@@ -132,7 +130,7 @@ export async function handleTicketClose(interaction) {
 }
 
 export async function handleTicketCloseConfirm(interaction) {
-  if (!hasTicketAccess(interaction.member, interaction.client.botOwnerId)) {
+  if (!isAdmin(interaction.member, interaction.client.botOwnerId)) {
     return interaction.reply({ content: 'You do not have permission to close this ticket.', flags: MessageFlags.Ephemeral });
   }
   const guildId = interaction.guildId;

@@ -44,7 +44,6 @@ db.run(`
   );
 `);
 
-try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_role_id TEXT`); } catch {}
 try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_category_id TEXT`); } catch {}
 try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catch {}
 try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
@@ -100,6 +99,7 @@ const createTicket = db.query('INSERT INTO tickets (guild_id, channel_id, author
 const ticketByChannel = db.query('SELECT * FROM tickets WHERE channel_id = ?');
 const claimTicket = db.query('UPDATE tickets SET status = \'claimed\', claimed_by = ? WHERE channel_id = ? AND status = \'open\'');
 const closeTicket = db.query('UPDATE tickets SET status = \'closed\', closed_at = ?, closed_by = ? WHERE channel_id = ?');
+const updateTicketChannel = db.query('UPDATE tickets SET channel_id = ? WHERE channel_id = ?');
 const openTicketByAuthor = db.query('SELECT * FROM tickets WHERE guild_id = ? AND author_id = ? AND status != \'closed\' LIMIT 1');
 const lastTicketByAuthor = db.query('SELECT created_at FROM tickets WHERE guild_id = ? AND author_id = ? ORDER BY created_at DESC LIMIT 1');
 
@@ -109,9 +109,15 @@ export const guilds = {
     statements.saveGuild.run(id, nickFormat, roleId, ticketCategoryId, ticketLogChannelId)
 };
 
+const createTicketTx = db.transaction((guildId, channelId, authorId) => {
+  const num = nextTicketNumber.get(guildId).num;
+  createTicket.run(guildId, channelId, authorId, Date.now(), num);
+  return num;
+});
+
 export const tickets = {
-  nextNumber: (guildId) => nextTicketNumber.get(guildId).num,
-  create: (guildId, channelId, authorId, number) => createTicket.run(guildId, channelId, authorId, Date.now(), number),
+  create: (guildId, channelId, authorId) => createTicketTx(guildId, channelId, authorId),
+  updateChannel: (oldId, newId) => updateTicketChannel.run(newId, oldId),
   getByChannel: (channelId) => ticketByChannel.get(channelId),
   claim: (channelId, userId) => claimTicket.run(userId, channelId),
   close: (channelId, closedBy) => closeTicket.run(Date.now(), closedBy, channelId),

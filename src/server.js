@@ -1,5 +1,5 @@
 import express from 'express';
-import { oauthStates, users } from './db.js';
+import { oauthStates } from './db.js';
 import { exchangeCode, getUserInfo } from './roblox.js';
 import { verifyMember } from './verification.js';
 import { robloxConfigured } from './config.js';
