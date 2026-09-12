@@ -81,7 +81,12 @@ client.on('guildMemberAdd', async (member) => {
   const linked = users.getByDiscord(member.id);
   if (!linked) return;
   try {
-    await applyVerification(member, { username: linked.username, display_name: linked.display_name });
+    const result = await applyVerification(member, { username: linked.username, display_name: linked.display_name });
+    const embed = new EmbedBuilder()
+      .setTitle(member.guild.name)
+      .setThumbnail(member.guild.iconURL({ size: 128 }) || null)
+      .setDescription(`You have been verified. Your nickname has been set to ${result.nickname}.`);
+    await member.send({ embeds: [embed] }).catch(() => {});
   } catch (error) {
     console.error(error);
   }

@@ -129,9 +129,7 @@ export const guilds = {
 export const ticketRoles = {
   add: (guildId, roleId) => {
     try {
-      const result = addTicketRole.run(guildId, roleId);
-      console.log(`[DB] ticketRoles.add(${guildId}, ${roleId}) -> changes: ${result.changes}`);
-      return result;
+      return addTicketRole.run(guildId, roleId);
     } catch (err) {
       console.error(`[DB] ticketRoles.add failed:`, err.message);
       throw err;
@@ -140,9 +138,7 @@ export const ticketRoles = {
   remove: (guildId, roleId) => removeTicketRole.run(guildId, roleId),
   list: (guildId) => {
     try {
-      const rows = listTicketRoles.all(guildId);
-      console.log(`[DB] ticketRoles.list(${guildId}) -> ${rows.length} roles`);
-      return rows.map((r) => r.role_id);
+      return listTicketRoles.all(guildId).map((r) => r.role_id);
     } catch (err) {
       console.error(`[DB] ticketRoles.list failed:`, err.message);
       return [];

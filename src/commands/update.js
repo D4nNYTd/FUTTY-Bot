@@ -10,8 +10,11 @@ export default {
     const userOption = interaction.options.getUser('user');
     let target;
     if (userOption) {
-      target = interaction.guild.members.cache.get(userOption.id) ?? null;
-      if (!target) return interaction.reply({ content: 'That user is not on this server.', flags: MessageFlags.Ephemeral });
+      try {
+        target = await interaction.guild.members.fetch(userOption.id);
+      } catch {
+        return interaction.reply({ content: 'That user is not on this server.', flags: MessageFlags.Ephemeral });
+      }
     } else {
       target = interaction.member;
     }

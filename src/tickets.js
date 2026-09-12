@@ -146,6 +146,7 @@ export async function handleTicketCloseConfirm(interaction) {
   const userId = interaction.user.id;
   const userTag = interaction.user.tag;
   const guildName = interaction.guild.name;
+  const channel = interaction.channel;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const ticket = tickets.getByChannel(channelId);
@@ -160,7 +161,7 @@ export async function handleTicketCloseConfirm(interaction) {
     const messages = [];
     let lastId;
     while (true) {
-      const batch = await interaction.channel.messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
+      const batch = await channel.messages.fetch({ limit: 100, ...(lastId ? { before: lastId } : {}) });
       if (batch.size === 0) break;
       for (const [, msg] of batch) messages.push(msg);
       lastId = batch.last()?.id;
@@ -205,7 +206,7 @@ export async function handleTicketCloseConfirm(interaction) {
   await interaction.editReply({ content: 'Ticket closed.' });
 
   setTimeout(async () => {
-    try { await interaction.channel.delete(); } catch {}
+    try { await channel.delete(); } catch {}
   }, 2000);
 }
 
