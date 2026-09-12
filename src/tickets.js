@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, MessageFlags, PermissionFlagsBits } from 'discord.js';
-import { guilds, ticketRoles, tickets, users } from './db.js';
+import { guilds, tickets, users } from './db.js';
 import { isAdmin } from './permissions.js';
 
 const COOLDOWN_MS = 10 * 60 * 1000;
@@ -31,8 +31,6 @@ export function buildTicketPanelRow() {
 }
 
 function hasTicketAccess(member, botOwnerId) {
-  const roles = ticketRoles.list(member.guild.id);
-  if (roles.some((roleId) => member.roles.cache.has(roleId))) return true;
   return isAdmin(member, botOwnerId);
 }
 
@@ -54,15 +52,11 @@ export async function handleTicketCreate(interaction) {
   const padded = String(number).padStart(4, '0');
   const channelName = `ticket-${padded}-${interaction.user.username.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20)}`;
 
-  const supportRoleIds = ticketRoles.list(interaction.guildId);
   const permissionOverwrites = [
     { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
     { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
     { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] }
   ];
-  for (const roleId of supportRoleIds) {
-    permissionOverwrites.push({ id: roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
-  }
 
   let channel;
   try {
