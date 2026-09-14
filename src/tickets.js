@@ -160,7 +160,16 @@ export async function handleTicketCloseConfirm(interaction) {
       if (batch.size < 100) break;
     }
     messages.reverse();
-    transcript = messages.map((m) => `[${m.createdAt.toISOString()}] ${m.author.tag}: ${m.content}`).join('\n');
+    transcript = messages.map((m) => {
+      const parts = [m.content];
+      for (const [, embed] of m.embeds) {
+        if (embed.title) parts.push(`[Embed: ${embed.title}]`);
+        if (embed.description) parts.push(embed.description);
+      }
+      for (const [, att] of m.attachments) parts.push(`[Attachment: ${att.name}]`);
+      const text = parts.filter(Boolean).join(' ') || '[No text content]';
+      return `[${m.createdAt.toISOString()}] ${m.author.tag}: ${text}`;
+    }).join('\n');
   } catch {}
 
   const settings = guilds.get(guildId);

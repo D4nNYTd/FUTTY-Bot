@@ -5,6 +5,8 @@ import { commands } from './commands/index.js';
 import { createState, applyVerification } from './verification.js';
 import { startServer } from './server.js';
 import { handleTicketCreate, handleTicketClaim, handleTicketClose, handleTicketCloseConfirm, handleTicketCloseCancel } from './tickets.js';
+import { handleMessage as handleQuizMessage, startAutoQuiz } from './quiz/index.js';
+import { quizConfig } from './db.js';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
 client.commands = new Collection(commands.map((command) => [command.data.name, command]));
@@ -38,6 +40,13 @@ client.once('clientReady', async () => {
   }
   startServer(client, config.port);
   setInterval(() => oauthStates.purge(), 60 * 1000);
+  // Start auto quiz for all configured guilds
+  if (allowedGuildIds.length > 0) {
+    for (const guildId of allowedGuildIds) {
+      const cfg = quizConfig.get(guildId);
+      if (cfg?.auto_enabled && cfg?.channel_id) startAutoQuiz(guildId, client);
+    }
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -90,6 +99,8 @@ client.on('guildMemberAdd', async (member) => {
     console.error(error);
   }
 });
+
+client.on('messageCreate', (message) => handleQuizMessage(message, client));
 
 client.on('channelDelete', async (channel) => {
   try {

@@ -49,6 +49,31 @@ try { db.run(`ALTER TABLE guilds ADD COLUMN ticket_log_channel_id TEXT`); } catc
 try { db.run(`ALTER TABLE tickets ADD COLUMN closed_by TEXT`); } catch {}
 try { db.run(`ALTER TABLE tickets ADD COLUMN number INTEGER`); } catch {}
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS quiz_points (
+    guild_id TEXT NOT NULL,
+    discord_id TEXT NOT NULL,
+    points INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, discord_id)
+  );
+  CREATE TABLE IF NOT EXISTS quiz_config (
+    guild_id TEXT PRIMARY KEY,
+    channel_id TEXT,
+    difficulty TEXT NOT NULL DEFAULT 'Random',
+    auto_enabled INTEGER NOT NULL DEFAULT 1
+  );
+`);
+
+const getQuizPoints = db.query('SELECT points FROM quiz_points WHERE guild_id = ? AND discord_id = ?');
+const upsertQuizPoints = db.query(`INSERT INTO quiz_points (guild_id, discord_id, points) VALUES (?, ?, ?)
+  ON CONFLICT(guild_id, discord_id) DO UPDATE SET points = excluded.points`);
+const getQuizConfig = db.query('SELECT * FROM quiz_config WHERE guild_id = ?');
+const saveQuizConfig = db.query(`INSERT INTO quiz_config (guild_id, channel_id, difficulty, auto_enabled) VALUES (?, ?, ?, ?)
+  ON CONFLICT(guild_id) DO UPDATE SET
+    channel_id = COALESCE(excluded.channel_id, quiz_config.channel_id),
+    difficulty = excluded.difficulty,
+    auto_enabled = excluded.auto_enabled`);
+
 const statements = {
   userByDiscord: db.query('SELECT * FROM users WHERE discord_id = ?'),
   userByRoblox: db.query('SELECT * FROM users WHERE roblox_id = ?'),
@@ -137,6 +162,22 @@ export const oauthStates = {
     return transaction();
   },
   purge: () => statements.purgeStates.run(Date.now())
+};
+
+export const quizPoints = {
+  get: (guildId, discordId) => getQuizPoints.get(guildId, discordId)?.points ?? 0,
+  add: (guildId, discordId, amount) => {
+    const current = getQuizPoints.get(guildId, discordId)?.points ?? 0;
+    const newTotal = current + amount;
+    upsertQuizPoints.run(guildId, discordId, newTotal);
+    return newTotal;
+  }
+};
+
+export const quizConfig = {
+  get: (guildId) => getQuizConfig.get(guildId),
+  save: (guildId, channelId, difficulty, autoEnabled) =>
+    saveQuizConfig.run(guildId, channelId, difficulty, autoEnabled ? 1 : 0)
 };
 
 export const admins = {
