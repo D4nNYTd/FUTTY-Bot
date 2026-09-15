@@ -107,7 +107,7 @@ export async function handleMessage(message, client) {
   let raw = curQ.question.answer[0];
   let pretty = raw.charAt(0).toUpperCase() + raw.slice(1);
   let emb = makeWinEmbed(message.author.toString(), pretty, p, total);
-  await message.channel.send({ embeds: [emb] }).catch(() => {});
+  await message.channel.send({ content: message.author.toString() + ' got it right!', embeds: [emb] }).catch(() => {});
   if (cfg && cfg.auto_enabled) {
     let t = setTimeout(async () => {
       try {
