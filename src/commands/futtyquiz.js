@@ -8,60 +8,48 @@ export default {
     .setName('futtyquiz')
     .setDescription('Manage FUTTY Quiz system.')
     .setDMPermission(false)
-    .addSubcommand((sub) => sub.setName('channel')
-      .setDescription('Set the quiz channel and enable auto mode.')
-      .addChannelOption((o) => o.setName('channel').setDescription('Text channel for quiz').addChannelTypes(ChannelType.GuildText).setRequired(true)))
-    .addSubcommand((sub) => sub.setName('difficulty')
-      .setDescription('Set quiz difficulty.')
-      .addStringOption((o) => o.setName('level').setDescription('Difficulty level').setRequired(true)
-        .addChoices(
-          { name: 'Easy', value: 'Easy' },
-          { name: 'Medium', value: 'Medium' },
-          { name: 'Hard', value: 'Hard' },
-          { name: 'Extreme', value: 'Extreme' },
-          { name: 'Random', value: 'Random' }
-        )))
-    .addSubcommand((sub) => sub.setName('start').setDescription('Manually start a quiz question now.'))
-    .addSubcommand((sub) => sub.setName('stop').setDescription('Stop auto quiz mode.'))
-    .addSubcommand((sub) => sub.setName('status').setDescription('Show current quiz settings.')),
+    .addSubcommand(function(sub) { return sub.setName('channel').setDescription('Set the quiz channel and enable auto mode.').addChannelOption(function(o) { return o.setName('channel').setDescription('Text channel for quiz').addChannelTypes(ChannelType.GuildText).setRequired(true); }); })
+    .addSubcommand(function(sub) { return sub.setName('difficulty').setDescription('Set quiz difficulty.').addStringOption(function(o) { return o.setName('level').setDescription('Difficulty level').setRequired(true).addChoices({ name: 'Easy', value: 'Easy' }, { name: 'Medium', value: 'Medium' }, { name: 'Hard', value: 'Hard' }, { name: 'Extreme', value: 'Extreme' }, { name: 'Random', value: 'Random' }); }); })
+    .addSubcommand(function(sub) { return sub.setName('start').setDescription('Manually start a quiz question now.'); })
+    .addSubcommand(function(sub) { return sub.setName('stop').setDescription('Stop auto quiz mode.'); })
+    .addSubcommand(function(sub) { return sub.setName('status').setDescription('Show current quiz settings.'); }),
   async execute(interaction) {
     if (!isAdmin(interaction.member, interaction.client.botOwnerId)) {
       return interaction.reply({ content: 'You do not have permission to manage quiz settings.', flags: MessageFlags.Ephemeral });
     }
-    const sub = interaction.options.getSubcommand();
-    const current = quizConfig.get(interaction.guildId);
+    let sub = interaction.options.getSubcommand();
+    let cur = quizConfig.get(interaction.guildId);
 
-    if (sub === 'channel') {
-      const channel = interaction.options.getChannel('channel');
-      quizConfig.save(interaction.guildId, channel.id, current?.difficulty || 'Random', true);
+    if (sub == 'channel') {
+      let ch = interaction.options.getChannel('channel');
+      quizConfig.save(interaction.guildId, ch.id, cur ? cur.difficulty : 'Random', true);
       startAutoQuiz(interaction.guildId, interaction.client);
-      return interaction.reply({ content: `Quiz channel set to ${channel}. Auto mode enabled.`, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: 'Quiz channel set to ' + ch + '. Auto mode enabled.', flags: MessageFlags.Ephemeral });
     }
 
-    if (sub === 'difficulty') {
-      const level = interaction.options.getString('level');
-      quizConfig.save(interaction.guildId, current?.channel_id || null, level, current?.auto_enabled ?? true);
-      return interaction.reply({ content: `Quiz difficulty set to **${level}**.`, flags: MessageFlags.Ephemeral });
+    if (sub == 'difficulty') {
+      let lvl = interaction.options.getString('level');
+      quizConfig.save(interaction.guildId, cur ? cur.channel_id : null, lvl, cur ? !!cur.auto_enabled : true);
+      return interaction.reply({ content: 'Quiz difficulty set to **' + lvl + '**.', flags: MessageFlags.Ephemeral });
     }
 
-    if (sub === 'start') {
+    if (sub == 'start') {
       return manualStart(interaction);
     }
 
-    if (sub === 'stop') {
+    if (sub == 'stop') {
       stopAutoQuiz(interaction.guildId);
-      quizConfig.save(interaction.guildId, current?.channel_id || null, current?.difficulty || 'Random', false);
+      quizConfig.save(interaction.guildId, cur ? cur.channel_id : null, cur ? cur.difficulty : 'Random', false);
       return interaction.reply({ content: 'Auto quiz mode stopped.', flags: MessageFlags.Ephemeral });
     }
 
-    if (sub === 'status') {
-      const status = getStatus(interaction.guildId);
-      const lines = [
-        `Channel: ${status.channel ? `<#${status.channel}>` : '(not set)'}`,
-        `Difficulty: ${status.difficulty}`,
-        `Auto mode: ${status.autoEnabled ? 'ON' : 'OFF'}`,
-        `Active question: ${status.hasActiveQuestion ? 'Yes' : 'No'}`
-      ];
+    if (sub == 'status') {
+      let st = getStatus(interaction.guildId);
+      let lines = [];
+      lines.push('Channel: ' + (st.channel ? '<#' + st.channel + '>' : '(not set)'));
+      lines.push('Difficulty: ' + st.difficulty);
+      lines.push('Auto mode: ' + (st.autoEnabled ? 'ON' : 'OFF'));
+      lines.push('Active question: ' + (st.hasActiveQuestion ? 'Yes' : 'No'));
       return interaction.reply({ content: lines.join('\n'), flags: MessageFlags.Ephemeral });
     }
   }
