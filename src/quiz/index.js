@@ -95,10 +95,10 @@ export async function handleMessage(message, client) {
   let cfg = quizConfig.get(message.guild.id);
   if (cfg && cfg.channel_id && message.channelId != cfg.channel_id) return;
   let rawTxt = message.content.trim();
-  if (!rawTxt) return;
-  let txt = rawTxt.toLowerCase().replace(/\s+/g, ' ');
+  if (!rawTxt || rawTxt.startsWith('/')) return;
+  let txt = rawTxt.toLowerCase();
   let curQ = state.current;
-  let ok = curQ.question.answer.some(a => a.toLowerCase().replace(/\s+/g, ' ') == txt);
+  let ok = curQ.question.answer.some(a => a.toLowerCase() == txt);
   if (!ok) return;
   state.current = null;
   let d = curQ.difficulty;
