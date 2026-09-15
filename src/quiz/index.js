@@ -3,6 +3,7 @@ import { quizPoints, quizConfig } from '../db.js';
 import { questions, points } from './questions.js';
 
 const emoji = '<:futty:1549086955994882108>';
+const QUIZ_ROLE_ID = '1543077811303096331';
 const autoTime = 60 * 60 * 1000;
 const delayTime = 30 * 1000;
 const quizzes = new Map();
@@ -37,7 +38,8 @@ async function sendQ(guild, chId, diff) {
   let q = getQ(diff);
   if (!q) return null;
   let emb = makeEmbed(q, diff);
-  let msg = await ch.send({ embeds: [emb] }).catch(() => null);
+  let ping = '<@&' + QUIZ_ROLE_ID + '>';
+  let msg = await ch.send({ content: ping, embeds: [emb] }).catch(() => null);
   if (!msg) return null;
   return { question: q, messageId: msg.id, difficulty: diff == 'Random' ? q.difficulty : diff };
 }
@@ -92,10 +94,11 @@ export async function handleMessage(message, client) {
   if (!state || !state.current) return;
   let cfg = quizConfig.get(message.guild.id);
   if (cfg && cfg.channel_id && message.channelId != cfg.channel_id) return;
-  let txt = message.content.trim().toLowerCase();
-  if (!txt) return;
+  let rawTxt = message.content.trim();
+  if (!rawTxt) return;
+  let txt = rawTxt.toLowerCase().replace(/\s+/g, ' ');
   let curQ = state.current;
-  let ok = curQ.question.answer.some(a => a.toLowerCase() == txt);
+  let ok = curQ.question.answer.some(a => a.toLowerCase().replace(/\s+/g, ' ') == txt);
   if (!ok) return;
   state.current = null;
   let d = curQ.difficulty;
